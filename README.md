@@ -1,9 +1,9 @@
-# Snake Path — Prototype Design Document
+# Railway Path — Prototype Design Document
 
 ## 1. High Concept
 
 A tile-based path-building puzzle on a hex grid.
-Each turn, the player chooses between two forced placements, shaping a continuous snake from the bottom of the board to the top. The challenge comes from anticipating future constraints: every move is legal now, but may lead to an unavoidable loss later.
+Each turn, the player chooses between two forced placements, shaping a continuous railway from the bottom of the board to the top. The challenge comes from anticipating future constraints: every move is legal now, but may lead to an unavoidable loss later.
 
 ---
 
@@ -12,15 +12,15 @@ Each turn, the player chooses between two forced placements, shaping a continuou
 1. Draw 2 tiles from the pool.
 2. Evaluate both:
    - Each tile has exactly one valid placement (forced by color + geometry).
-3. Optionally spend 1 apple token:
+3. Optionally spend 1 token to hire a surveyor:
    - Draw 2 additional tiles.
 4. Choose 1 tile to play.
 5. Place the tile:
-   - Extend the snake.
-   - Advance the head.
+   - Lay track.
+   - Advance the engine.
 6. Resolve:
    - Return unused tiles to the pool.
-   - Collect apple if present.
+   - Collect a token if present.
    - Check for loss.
 7. Repeat.
 
@@ -30,7 +30,7 @@ Each turn, the player chooses between two forced placements, shaping a continuou
 
 - **Win:** Reach any hex on the top row.
 - **Lose:** If placement causes:
-  - Collision with self, or
+  - Collision with existing track, or
   - Exit off the board
 
 ---
@@ -40,7 +40,7 @@ Each turn, the player chooses between two forced placements, shaping a continuou
 - Hex grid (fixed layout)
 - Start: bottom entry position
 - Goal: any top-row hex
-- Apples:
+- Tokens:
   - Placed randomly at setup
   - Collected automatically when entered
   - Do not respawn (for now--TBD)
@@ -52,13 +52,13 @@ Future:
 
 ---
 
-## 5. Snake Rules
+## 5. Railway Rules
 
-- The snake is a continuous path of placed tiles
+- The railway is a continuous path of placed tiles
 - It:
-  - Never shrinks
+  - Never retracts
   - Cannot overlap itself
-  - Has a single “head” at all times
+  - Has a single active “engine” end at all times
 
 ---
 
@@ -90,7 +90,7 @@ Tiles represent mappings from entry edge → exit edge:
 
 ## 7. Placement Rules
 
-- The snake head exposes:
+- The engine exposes:
   - A **current edge**
   - A **required color** (red or blue)
 
@@ -100,7 +100,7 @@ Tiles represent mappings from entry edge → exit edge:
 
 - Result:
   - Each tile has exactly **one forced placement**
-  - The exit edge determines the next head position
+  - The exit edge determines the next engine position
   - The next edge color **always alternates**
 
 ---
@@ -109,31 +109,31 @@ Tiles represent mappings from entry edge → exit edge:
 
 - **All drawn tiles are always playable**
 - A move can still immediately lose if it causes a collision with any obstacle:
-  - self-collision
+  - colliding with existing track
   - exiting the board before reaching the goal
   - hitting a wall (TBD)
 
 ---
 
-## 9. Apple System
+## 9. Survey System
 
 ### 9.1 Starting Tokens
 
-- Player begins with 1 apple token (TBD)
+- Player begins with 1 token (TBD)
 
 ### 9.2 Usage
 
-- Spend (discard) 1 apple:
+- Spend (discard) 1 token to hire a surveyor:
   - Draw 2 additional tiles to choose from
 
 ### 9.3 Pickup
 
-- Landing on an apple:
-  - Gain +1 apple
+- Landing on a token:
+  - Gain +1 token
 
 ### 9.4 Timing
 
-- Apple use occurs **after seeing both initial tiles, before placing**
+- Survey use occurs **after seeing both initial tiles, before placing**
 
 ---
 
@@ -154,7 +154,7 @@ Tiles represent mappings from entry edge → exit edge:
 - Initial position is fixed
 - Player may choose the **initial orientation**
   - Small but meaningful agency:
-    - Can aim toward apples
+    - Can aim toward tokens
     - Can avoid early constraints (if any--TBD)
 
 ---
@@ -164,13 +164,13 @@ Tiles represent mappings from entry edge → exit edge:
 Each turn:
 
 - Choose between two deterministic outcomes
-- Optionally spend a resource to reroll options
+- Optionally spend a resource to redraw options
 
 Skill comes from:
 
 - Reading future constraints
 - Avoiding self-trapping patterns
-- Managing limited rerolls (apples)
+- Managing limited redraws (tokens)
 
 ---
 
@@ -192,8 +192,8 @@ Skill comes from:
 
 - Tile distribution (straight vs soft vs hard turns)
 - Board width / height
-- Apple density
-- Starting apple count
+- Token density
+- Starting token count
 
 ### Structural
 
@@ -210,7 +210,7 @@ Playtesting should answer:
 2. Are losses perceived as:
    - Fair (avoidable), or
    - Inevitable (frustrating)?
-3. Are apples:
+3. Are tokens:
    - Too strong (remove tension)?
    - Too weak (never helpful)?
 4. Does tile distribution:
@@ -231,7 +231,7 @@ Playtesting should answer:
 ## 17. Future Considerations
 
 - Obstacles / blocked hexes
-- Apple respawn mechanics
+- Token respawn mechanics
 - Alternate win conditions (specific exit points)
 - Difficulty tiers via board design
 - Expanded tile sets (if needed)
