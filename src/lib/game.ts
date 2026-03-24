@@ -419,7 +419,7 @@ function hasCell(board: BoardState, key: string): boolean {
 
 function describePreview(preview: MovePreview): string {
   if (preview.outcome === 'win') {
-    return preview.tokenGain > 0 ? 'Reached the top row and collected a token.' : 'Reached the top row.'
+    return preview.tokenGain > 0 ? 'Reached a goal space and collected a token.' : 'Reached a goal space.'
   }
 
   if (preview.outcome === 'loss') {
@@ -489,7 +489,7 @@ export function previewMove(game: GameState, tile: Tile): MovePreview {
       nextRequiredColor,
       tokenGain,
       outcome: 'win',
-      reason: 'Reached the top row.',
+      reason: 'Reached a goal space.',
     }
   }
 
@@ -550,7 +550,7 @@ export function createGame(inputRules: RulesConfig): GameState {
     rules,
     board,
     status: 'playing',
-    statusMessage: 'Lay track from the bottom to any top-row hex.',
+    statusMessage: 'Lay track from the bottom to any highlighted goal space.',
     turnNumber: 1,
     tokens: rules.startingTokens,
     frontier: {
@@ -662,7 +662,7 @@ export function chooseTile(game: GameState, tileId: string): GameState {
       offer: [],
       history: [historyEntry, ...game.history].slice(0, 12),
       status: 'won',
-      statusMessage: 'Reached the top row.',
+      statusMessage: 'Reached a goal space.',
     }
   }
 

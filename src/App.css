@@ -180,6 +180,46 @@
   max-height: 70vh;
 }
 
+.board-legend {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.9rem;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.legend-swatch {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(58, 48, 32, 0.18);
+  flex: 0 0 auto;
+}
+
+.legend-goal {
+  background: rgba(223, 181, 89, 0.34);
+}
+
+.legend-token {
+  background: var(--gold);
+}
+
+.legend-obstacle {
+  background: rgba(92, 77, 57, 0.18);
+}
+
+.board-note {
+  margin: 0.7rem 0 0;
+}
+
 .hex-tile {
   fill: rgba(255, 251, 242, 0.9);
   stroke: rgba(58, 48, 32, 0.18);
@@ -187,7 +227,8 @@
 }
 
 .goal-cell {
-  fill: rgba(223, 181, 89, 0.22);
+  fill: rgba(223, 181, 89, 0.34);
+  stroke: rgba(171, 118, 27, 0.34);
 }
 
 .obstacle-cell {

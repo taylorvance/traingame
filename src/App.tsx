@@ -48,7 +48,7 @@ function describeTile(tile: Tile): string {
 
 function describePreview(preview: MovePreview): string {
   if (preview.outcome === 'win') {
-    return preview.tokenGain > 0 ? 'Win and gain 1 token.' : 'Win by reaching the top row.'
+    return preview.tokenGain > 0 ? 'Win, gain 1 token, and reach a goal space.' : 'Win by reaching a goal space.'
   }
 
   if (preview.outcome === 'loss') {
@@ -192,10 +192,30 @@ function App() {
                 <div className="board-badges">
                   <span className={`status-pill status-${game.status}`}>{game.status}</span>
                   <span className="soft-pill">Start {game.board.start.key}</span>
+                  <span className="soft-pill">Goal highlighted spaces</span>
                 </div>
               </div>
 
               <HexBoard game={game} hoveredTileId={hoveredTileId} previews={previews} />
+
+              <div aria-label="Board legend" className="board-legend">
+                <span className="legend-item">
+                  <span aria-hidden="true" className="legend-swatch legend-goal" />
+                  Goal spaces
+                </span>
+                <span className="legend-item">
+                  <span aria-hidden="true" className="legend-swatch legend-token" />
+                  Tokens
+                </span>
+                <span className="legend-item">
+                  <span aria-hidden="true" className="legend-swatch legend-obstacle" />
+                  Obstacles
+                </span>
+              </div>
+
+              <p className="panel-note board-note">
+                Reach any highlighted goal space to win. The rules are unchanged; the goal is now shown directly on the board.
+              </p>
             </section>
 
             <section className="panel options-panel">
