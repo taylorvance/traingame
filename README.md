@@ -4,7 +4,22 @@ A small railway path-building puzzle prototype.
 
 ## Status
 
-This repo currently holds the game design docs and web prototype planning notes.
+This repo now includes an in-browser prototype plus the game design docs and planning notes.
+The toolchain follows the shared consumer conventions from `tv-shared`.
+
+## Run
+
+```bash
+npm install
+npm run dev
+```
+
+Useful scripts:
+
+- `npm run lint`
+- `npm run test`
+- `npm run build`
+- `npm run verify`
 
 ## Docs
 
@@ -14,10 +29,11 @@ This repo currently holds the game design docs and web prototype planning notes.
 
 ## Next Step
 
-Build a browser prototype of the core game loop:
+Current prototype focus:
 
 - Draw 2 track tiles
 - Optionally spend 1 token to hire a surveyor and reveal 2 more
 - Choose 1 forced placement
 - Advance the engine
 - Collect tokens, check win/loss, repeat
+- Tweak balancing levers from the in-app control panel

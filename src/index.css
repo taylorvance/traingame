@@ -1,0 +1,96 @@
+:root {
+  font-family: 'Avenir Next', 'Trebuchet MS', sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #261f16;
+  background-color: #efe1c9;
+  color-scheme: light;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --ink: #261f16;
+  --muted: #655a4b;
+  --surface: rgba(249, 243, 233, 0.9);
+  --line: rgba(38, 31, 22, 0.1);
+  --line-strong: rgba(38, 31, 22, 0.18);
+  --focus: #22606a;
+  --shadow: 0 24px 60px rgba(38, 31, 22, 0.14);
+  --track-green: #24605a;
+  --signal: #8b5c2b;
+  --rail: #513b2d;
+  --gold: #d9ab43;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 14% 16%, rgba(217, 171, 67, 0.26), transparent 26%),
+    radial-gradient(circle at 84% 14%, rgba(36, 96, 90, 0.18), transparent 28%),
+    linear-gradient(180deg, #f2e5cf 0%, #ead6b9 44%, #dcc09b 100%);
+  color: var(--ink);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.82rem 1.2rem;
+  background: var(--track-green);
+  color: #fff9ef;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--track-green);
+}
+
+input[type='number'],
+select {
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 0.74rem 0.88rem;
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--ink);
+}

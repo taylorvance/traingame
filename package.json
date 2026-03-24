@@ -1,0 +1,37 @@
+{
+  "name": "traingame",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "clean": "rm -rf node_modules dist coverage .vite .eslintcache *.tsbuildinfo",
+    "dev": "vite --host",
+    "lint": "eslint .",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest --run",
+    "verify": "npm run lint && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@taylorvance/tv-shared-ui": "^0.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@taylorvance/tv-shared-config": "^0.1.1",
+    "@types/node": "^24.10.4",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react-swc": "^4.2.2",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4",
+    "vitest": "^4.0.16"
+  }
+}
