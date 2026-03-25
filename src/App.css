@@ -255,6 +255,26 @@
   stroke: rgba(171, 118, 27, 0.34);
 }
 
+.goal-glyph {
+  pointer-events: none;
+}
+
+.goal-station-base {
+  fill: rgba(197, 108, 63, 0.9);
+}
+
+.goal-station-roof {
+  fill: rgba(126, 58, 37, 0.94);
+}
+
+.goal-station-door {
+  fill: rgba(94, 49, 34, 0.88);
+}
+
+.goal-station-window {
+  fill: rgba(246, 241, 217, 0.9);
+}
+
 .obstacle-cell {
   fill: rgba(92, 77, 57, 0.18);
 }
@@ -271,10 +291,19 @@
 }
 
 .obstacle-glyph {
-  fill: rgba(92, 55, 40, 0.9);
-  font-size: 1rem;
-  font-weight: 800;
-  text-anchor: middle;
+  pointer-events: none;
+}
+
+.obstacle-mountain-back {
+  fill: rgba(93, 106, 98, 0.82);
+}
+
+.obstacle-mountain-front {
+  fill: rgba(66, 78, 71, 0.9);
+}
+
+.obstacle-snow {
+  fill: rgba(246, 243, 236, 0.88);
 }
 
 .track-rail {

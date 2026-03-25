@@ -62,6 +62,38 @@ describe('move resolution', () => {
     expect(game.tokenCells.every((key) => !goalKeys.has(key))).toBe(true)
   })
 
+  it('slightly favors central columns when placing tokens', () => {
+    let centerHits = 0
+    let edgeHits = 0
+
+    for (let seed = 1; seed <= 48; seed += 1) {
+      const game = createGame({
+        ...DEFAULT_RULES,
+        obstacleCount: 0,
+        tokenDensityPercent: 25,
+        seed,
+      })
+      const centerColumns = new Set([
+        Math.floor((game.board.width - 1) / 2),
+        Math.ceil((game.board.width - 1) / 2),
+      ])
+      const edgeColumns = new Set([0, game.board.width - 1])
+
+      for (const key of game.tokenCells) {
+        const [col] = key.split(',').map(Number)
+        if (centerColumns.has(col ?? -1)) {
+          centerHits += 1
+        }
+
+        if (edgeColumns.has(col ?? -1)) {
+          edgeHits += 1
+        }
+      }
+    }
+
+    expect(centerHits).toBeGreaterThan(edgeHits)
+  })
+
   it('plays a tile and advances the frontier when the move is safe', () => {
     const game = createGame({
       ...DEFAULT_RULES,
@@ -81,6 +113,27 @@ describe('move resolution', () => {
     expect(Object.keys(nextGame.occupiedTracks)).toHaveLength(1)
     expect(placedTrack?.entryColor).toBe('red')
     expect(placedTrack?.exitColor).toBe('blue')
+  })
+
+  it('collects tokens immediately on pickup', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      obstacleCount: 0,
+      tokenDensityPercent: 0,
+      seed: 11,
+    })
+    const safeTile = game.offer.find((tile) => previewMove(game, tile).outcome === 'continue')
+
+    expect(safeTile).toBeDefined()
+
+    const tokenGame = {
+      ...game,
+      tokenCells: [game.board.start.key],
+    }
+    const nextGame = chooseTile(tokenGame, safeTile!.id)
+
+    expect(nextGame.tokens).toBe(game.tokens + 1)
+    expect(nextGame.tokenCells).not.toContain(game.board.start.key)
   })
 
   it('marks a move as blocked if it steers into an obstacle on the next forced hex', () => {

@@ -328,6 +328,52 @@ function sampleCellKeys(
   return [chosen, nextState]
 }
 
+function sampleWeightedCellKeys(
+  sourceCells: Cell[],
+  count: number,
+  state: number,
+  getWeight: (cell: Cell) => number,
+): [string[], number] {
+  const pool = [...sourceCells]
+  const chosen: string[] = []
+  let nextState = state
+  const drawCount = Math.min(count, pool.length)
+
+  for (let index = 0; index < drawCount; index += 1) {
+    const totalWeight = pool.reduce((sum, cell) => sum + Math.max(0, getWeight(cell)), 0)
+
+    if (totalWeight <= 0) {
+      const [choiceIndex, sampledState] = randomIndex(pool.length, nextState)
+      nextState = sampledState
+      const [choice] = pool.splice(choiceIndex, 1)
+      if (choice) {
+        chosen.push(choice.key)
+      }
+      continue
+    }
+
+    const [value, sampledState] = nextRandom(nextState)
+    nextState = sampledState
+    let target = value * totalWeight
+    let choiceIndex = 0
+
+    for (let poolIndex = 0; poolIndex < pool.length; poolIndex += 1) {
+      target -= Math.max(0, getWeight(pool[poolIndex]!))
+      if (target <= 0) {
+        choiceIndex = poolIndex
+        break
+      }
+    }
+
+    const [choice] = pool.splice(choiceIndex, 1)
+    if (choice) {
+      chosen.push(choice.key)
+    }
+  }
+
+  return [chosen, nextState]
+}
+
 function generateBoardFeatures(board: BoardState, rules: RulesConfig, state: number): [string[], string[], number] {
   const startKey = board.start.key
   const nonStartCells = board.cells.filter((cell) => cell.key !== startKey && cell.row !== 0).map((cell) => cell.key)
@@ -336,9 +382,19 @@ function generateBoardFeatures(board: BoardState, rules: RulesConfig, state: num
   const obstacleSet = new Set(obstacleCells)
   const tokenCandidates = board.cells
     .filter((cell) => cell.key !== startKey && cell.row !== 0 && !obstacleSet.has(cell.key))
-    .map((cell) => cell.key)
   const desiredTokens = Math.round(board.cells.length * (rules.tokenDensityPercent / 100))
-  const [tokenCells, tokenState] = sampleCellKeys(tokenCandidates, desiredTokens, obstacleState)
+  const boardCenterCol = (board.width - 1) / 2
+  const maxColDistance = Math.max(boardCenterCol, 1)
+  const [tokenCells, tokenState] = sampleWeightedCellKeys(
+    tokenCandidates,
+    desiredTokens,
+    obstacleState,
+    (cell) => {
+      const distanceFromCenter = Math.abs(cell.col - boardCenterCol)
+      const centrality = 1 - (distanceFromCenter / maxColDistance)
+      return 1 + centrality * 0.85
+    },
+  )
 
   return [tokenCells, obstacleCells, tokenState]
 }

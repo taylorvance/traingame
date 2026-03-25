@@ -70,14 +70,22 @@ export default function HexBoard({ game }: { game: GameState }) {
               points={getHexPoints(HEX_RADIUS, center.x, center.y)}
             />
 
-            {hasToken ? (
-              <circle className="token-glyph" cx={center.x} cy={center.y} r={11} />
+            {isObstacle ? (
+              <g className="obstacle-glyph" transform={`translate(${center.x} ${center.y + 4})`}>
+                <path className="obstacle-mountain-back" d="M -18 10 L -8 -8 L 0 4 L 8 -10 L 18 10 Z" />
+                <path className="obstacle-mountain-front" d="M -22 10 L -9 -14 L 0 -1 L 10 -14 L 22 10 Z" />
+                <path className="obstacle-snow" d="M -9 -14 L -5 -7 L -1 -3 L 3 -8 L 10 -14 L 6 -6 L 0 -1 Z" />
+              </g>
             ) : null}
 
-            {isObstacle ? (
-              <text className="obstacle-glyph" x={center.x} y={center.y + 6}>
-                X
-              </text>
+            {isGoal ? (
+              <g className="goal-glyph" transform={`translate(${center.x} ${center.y + 3})`}>
+                <rect className="goal-station-base" x="-13" y="-5" width="26" height="15" rx="2.5" />
+                <path className="goal-station-roof" d="M -16 -4 L 0 -16 L 16 -4 Z" />
+                <rect className="goal-station-door" x="-3.5" y="0" width="7" height="10" rx="1.5" />
+                <rect className="goal-station-window" x="-10" y="-1" width="4" height="4" rx="1" />
+                <rect className="goal-station-window" x="6" y="-1" width="4" height="4" rx="1" />
+              </g>
             ) : null}
 
             {occupiedTrack ? (
@@ -104,6 +112,10 @@ export default function HexBoard({ game }: { game: GameState }) {
                   {...getEdgeSegment(HEX_RADIUS, center.x, center.y, occupiedTrack.exitEdge)}
                 />
               </>
+            ) : null}
+
+            {hasToken ? (
+              <circle className="token-glyph" cx={center.x} cy={center.y} r={11} />
             ) : null}
 
             {isFrontier ? (
