@@ -28,13 +28,19 @@ describe('normalizeRules', () => {
 })
 
 describe('survey flow', () => {
-  it('spends a token and reveals two additional options', () => {
-    const game = createGame(DEFAULT_RULES)
-    const surveyed = spendSurveyToken(game)
+  it('spends tokens and can be used multiple times in the same turn', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      startingTokens: 3,
+    })
+    const surveyedOnce = spendSurveyToken(game)
+    const surveyedTwice = spendSurveyToken(surveyedOnce)
 
-    expect(surveyed.tokens).toBe(game.tokens - 1)
-    expect(surveyed.offer).toHaveLength(4)
-    expect(surveyed.surveyUsedThisTurn).toBe(true)
+    expect(surveyedOnce.tokens).toBe(game.tokens - 1)
+    expect(surveyedOnce.offer).toHaveLength(4)
+    expect(surveyedTwice.tokens).toBe(game.tokens - 2)
+    expect(surveyedTwice.offer).toHaveLength(6)
+    expect(surveyedTwice.surveyUsedThisTurn).toBe(false)
   })
 })
 
@@ -43,6 +49,17 @@ describe('move resolution', () => {
     const game = createGame(DEFAULT_RULES)
 
     expect(game.statusMessage).toBe('Lay track from the bottom to any highlighted goal space.')
+  })
+
+  it('never places tokens on goal spaces', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      tokenDensityPercent: 40,
+      seed: 11,
+    })
+    const goalKeys = new Set(game.board.cells.filter((cell) => cell.row === 0).map((cell) => cell.key))
+
+    expect(game.tokenCells.every((key) => !goalKeys.has(key))).toBe(true)
   })
 
   it('plays a tile and advances the frontier when the move is safe', () => {
@@ -57,37 +74,114 @@ describe('move resolution', () => {
     expect(safeTile).toBeDefined()
 
     const nextGame = chooseTile(game, safeTile!.id)
+    const placedTrack = Object.values(nextGame.occupiedTracks)[0]
+
     expect(nextGame.turnNumber).toBe(2)
     expect(nextGame.status).toBe('playing')
     expect(Object.keys(nextGame.occupiedTracks)).toHaveLength(1)
+    expect(placedTrack?.entryColor).toBe('red')
+    expect(placedTrack?.exitColor).toBe('blue')
   })
 
-  it('wins by reaching a highlighted goal space without changing the underlying rule', () => {
+  it('marks a move as blocked if it steers into an obstacle on the next forced hex', () => {
     const game = createGame({
       ...DEFAULT_RULES,
       obstacleCount: 0,
       tokenDensityPercent: 0,
       seed: 11,
     })
-    const goalCell = game.board.cells.find((cell) => cell.row === 0)
+    const candidateTiles = [
+      { id: 'straight', kind: 'straight' as const },
+      { id: 'soft-left', kind: 'softLeft' as const },
+      { id: 'soft-right', kind: 'softRight' as const },
+      { id: 'hard-left', kind: 'hardLeft' as const },
+      { id: 'hard-right', kind: 'hardRight' as const },
+    ]
 
-    expect(goalCell).toBeDefined()
+    let blockedPreview:
+      | ReturnType<typeof previewMove>
+      | undefined
 
-    const goalGame = {
-      ...game,
-      frontier: {
-        ...game.frontier,
-        col: goalCell!.col,
-        row: goalCell!.row,
-      },
-      offer: [{ id: 'goal-tile', kind: 'straight' as const }],
+    for (const tile of candidateTiles) {
+      const initialPreview = previewMove(game, tile)
+      if (initialPreview.outcome !== 'continue' || !initialPreview.nextKey) {
+        continue
+      }
+
+      const obstacleGame = {
+        ...game,
+        obstacleCells: [initialPreview.nextKey],
+        offer: [tile],
+      }
+      const obstaclePreview = previewMove(obstacleGame, tile)
+
+      if (obstaclePreview.outcome === 'loss') {
+        blockedPreview = obstaclePreview
+        break
+      }
     }
 
-    const preview = previewMove(goalGame, goalGame.offer[0]!)
+    expect(blockedPreview).toBeDefined()
+    expect(blockedPreview?.reason).toBe('Steers into an obstacle.')
+  })
+
+  it('wins as soon as a move enters a highlighted goal space', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      obstacleCount: 0,
+      tokenDensityPercent: 0,
+      seed: 11,
+    })
+    const approachCell = game.board.cells.find((cell) => cell.row === 1)
+    const candidateTiles = [
+      { id: 'straight', kind: 'straight' as const },
+      { id: 'soft-left', kind: 'softLeft' as const },
+      { id: 'soft-right', kind: 'softRight' as const },
+      { id: 'hard-left', kind: 'hardLeft' as const },
+      { id: 'hard-right', kind: 'hardRight' as const },
+    ]
+    const edges = [0, 1, 2, 3, 4, 5] as const
+
+    expect(approachCell).toBeDefined()
+
+    let winningTile: (typeof candidateTiles)[number] | undefined
+    let goalGame:
+      | ReturnType<typeof createGame>
+      | undefined
+
+    for (const entryEdge of edges) {
+      for (const tile of candidateTiles) {
+        const trialGame = {
+          ...game,
+          frontier: {
+            ...game.frontier,
+            col: approachCell!.col,
+            row: approachCell!.row,
+            entryEdge,
+          },
+          offer: [tile],
+        }
+
+        if (previewMove(trialGame, tile).outcome === 'win') {
+          winningTile = tile
+          goalGame = trialGame
+          break
+        }
+      }
+
+      if (winningTile && goalGame) {
+        break
+      }
+    }
+
+    expect(winningTile).toBeDefined()
+    expect(goalGame).toBeDefined()
+
+    const preview = previewMove(goalGame!, winningTile!)
     expect(preview.outcome).toBe('win')
     expect(preview.reason).toBe('Reached a goal space.')
 
-    const wonGame = chooseTile(goalGame, 'goal-tile')
+    const wonGame = chooseTile(goalGame!, winningTile!.id)
     expect(wonGame.status).toBe('won')
     expect(wonGame.statusMessage).toBe('Reached a goal space.')
   })

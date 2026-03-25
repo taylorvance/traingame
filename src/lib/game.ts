@@ -46,7 +46,9 @@ export interface Tile {
 export interface PlacedTrack {
   tile: Tile
   entryEdge: Edge
+  entryColor: Color
   exitEdge: Edge
+  exitColor: Color
   turnNumber: number
 }
 
@@ -333,7 +335,7 @@ function generateBoardFeatures(board: BoardState, rules: RulesConfig, state: num
   const [obstacleCells, obstacleState] = sampleCellKeys(nonStartCells, obstacleCap, state)
   const obstacleSet = new Set(obstacleCells)
   const tokenCandidates = board.cells
-    .filter((cell) => cell.key !== startKey && !obstacleSet.has(cell.key))
+    .filter((cell) => cell.key !== startKey && cell.row !== 0 && !obstacleSet.has(cell.key))
     .map((cell) => cell.key)
   const desiredTokens = Math.round(board.cells.length * (rules.tokenDensityPercent / 100))
   const [tokenCells, tokenState] = sampleCellKeys(tokenCandidates, desiredTokens, obstacleState)
@@ -509,6 +511,45 @@ export function previewMove(game: GameState, tile: Tile): MovePreview {
     }
   }
 
+  if (game.obstacleCells.includes(nextKey)) {
+    return {
+      tile,
+      targetKey,
+      exitEdge,
+      nextKey,
+      nextRequiredColor,
+      tokenGain,
+      outcome: 'loss',
+      reason: 'Steers into an obstacle.',
+    }
+  }
+
+  if (game.occupiedTracks[nextKey]) {
+    return {
+      tile,
+      targetKey,
+      exitEdge,
+      nextKey,
+      nextRequiredColor,
+      tokenGain,
+      outcome: 'loss',
+      reason: 'Steers into existing track.',
+    }
+  }
+
+  if (nextRow === 0) {
+    return {
+      tile,
+      targetKey,
+      exitEdge,
+      nextKey,
+      nextRequiredColor,
+      tokenGain,
+      outcome: 'win',
+      reason: 'Reached a goal space.',
+    }
+  }
+
   return {
     tile,
     targetKey,
@@ -572,7 +613,7 @@ export function createGame(inputRules: RulesConfig): GameState {
 }
 
 export function spendSurveyToken(game: GameState): GameState {
-  if (game.status !== 'playing' || game.tokens <= 0 || game.surveyUsedThisTurn) {
+  if (game.status !== 'playing' || game.tokens <= 0) {
     return game
   }
 
@@ -588,12 +629,12 @@ export function spendSurveyToken(game: GameState): GameState {
   return {
     ...game,
     tokens: game.tokens - 1,
-    surveyUsedThisTurn: true,
+    surveyUsedThisTurn: false,
     deck,
     offer: [...game.offer, ...extraTiles],
     nextTileSerial,
     rngState,
-    statusMessage: 'Surveyor hired. Choose from four forced placements.',
+    statusMessage: 'Survey token spent. Two more choices added.',
   }
 }
 
@@ -624,7 +665,9 @@ export function chooseTile(game: GameState, tileId: string): GameState {
     [preview.targetKey]: {
       tile: chosenTile,
       entryEdge: game.frontier.entryEdge,
+      entryColor: game.frontier.requiredColor,
       exitEdge: preview.exitEdge,
+      exitColor: preview.nextRequiredColor,
       turnNumber: game.turnNumber,
     },
   }

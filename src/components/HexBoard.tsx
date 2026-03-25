@@ -1,9 +1,9 @@
+import { getExitEdge, type Color, type GameState } from '../lib/game'
 import {
-  getBoardCellMap,
-  type Edge,
-  type GameState,
-  type MovePreview,
-} from '../lib/game'
+  getEdgeSegment,
+  getHexPoints,
+  getRailPaths,
+} from './railGeometry'
 
 const HEX_RADIUS = 34
 const HEX_HEIGHT = Math.sqrt(3) * HEX_RADIUS
@@ -27,73 +27,15 @@ function getBoardBounds(game: GameState): { width: number; height: number } {
   }
 }
 
-function getHexPoints(centerX: number, centerY: number): string {
-  const points = [
-    [HEX_RADIUS, 0],
-    [HEX_RADIUS / 2, HEX_HEIGHT / 2],
-    [-HEX_RADIUS / 2, HEX_HEIGHT / 2],
-    [-HEX_RADIUS, 0],
-    [-HEX_RADIUS / 2, -HEX_HEIGHT / 2],
-    [HEX_RADIUS / 2, -HEX_HEIGHT / 2],
-  ]
-
-  return points.map(([x, y]) => `${centerX + x},${centerY + y}`).join(' ')
+function edgeBandClass(color: Color): string {
+  return `edge-band edge-band-${color}`
 }
 
-function getEdgeMidpoint(edge: Edge): { x: number; y: number } {
-  switch (edge) {
-    case 0:
-      return { x: 0, y: -HEX_HEIGHT / 2 }
-    case 1:
-      return { x: HEX_RADIUS * 0.75, y: -HEX_HEIGHT / 4 }
-    case 2:
-      return { x: HEX_RADIUS * 0.75, y: HEX_HEIGHT / 4 }
-    case 3:
-      return { x: 0, y: HEX_HEIGHT / 2 }
-    case 4:
-      return { x: -HEX_RADIUS * 0.75, y: HEX_HEIGHT / 4 }
-    case 5:
-      return { x: -HEX_RADIUS * 0.75, y: -HEX_HEIGHT / 4 }
-  }
+function rotationForEntryEdge(entryEdge: number): number {
+  return (entryEdge - 3) * 60
 }
 
-function getTrackPath(centerX: number, centerY: number, entryEdge: Edge, exitEdge: Edge): string {
-  const start = getEdgeMidpoint(entryEdge)
-  const end = getEdgeMidpoint(exitEdge)
-
-  if (((entryEdge + 3) % 6) === exitEdge) {
-    return `M ${centerX + start.x} ${centerY + start.y} L ${centerX + end.x} ${centerY + end.y}`
-  }
-
-  return `M ${centerX + start.x} ${centerY + start.y} Q ${centerX} ${centerY} ${centerX + end.x} ${centerY + end.y}`
-}
-
-function getPreviewClass(preview: MovePreview | null): string {
-  if (!preview) {
-    return ''
-  }
-
-  switch (preview.outcome) {
-    case 'win':
-      return 'preview-win'
-    case 'loss':
-      return 'preview-loss'
-    case 'continue':
-      return 'preview-continue'
-  }
-}
-
-export default function HexBoard({
-  game,
-  hoveredTileId,
-  previews,
-}: {
-  game: GameState
-  hoveredTileId: string | null
-  previews: Record<string, MovePreview>
-}) {
-  const boardCellMap = getBoardCellMap(game.board)
-  const hoveredPreview = hoveredTileId ? previews[hoveredTileId] ?? null : null
+export default function HexBoard({ game }: { game: GameState }) {
   const bounds = getBoardBounds(game)
 
   return (
@@ -112,17 +54,20 @@ export default function HexBoard({
       {game.board.cells.map((cell) => {
         const center = getHexCenter(cell.col, cell.row)
         const occupiedTrack = game.occupiedTracks[cell.key]
+        const baseExitEdge = occupiedTrack ? getExitEdge(3, occupiedTrack.tile.kind) : null
+        const railPaths = occupiedTrack && baseExitEdge !== null
+          ? getRailPaths(HEX_RADIUS, center.x, center.y, 3, baseExitEdge, 4.4)
+          : null
         const isFrontier = game.frontier.col === cell.col && game.frontier.row === cell.row && game.status === 'playing'
         const isObstacle = game.obstacleCells.includes(cell.key)
         const hasToken = game.tokenCells.includes(cell.key)
         const isGoal = cell.row === 0
-        const previewTarget = hoveredPreview && hoveredPreview.targetKey === cell.key ? hoveredPreview : null
 
         return (
-          <g className={`board-cell ${getPreviewClass(previewTarget)}`} key={cell.key}>
+          <g className="board-cell" key={cell.key}>
             <polygon
               className={`hex-tile ${isGoal ? 'goal-cell' : ''} ${isObstacle ? 'obstacle-cell' : ''} ${isFrontier ? 'frontier-cell' : ''}`}
-              points={getHexPoints(center.x, center.y)}
+              points={getHexPoints(HEX_RADIUS, center.x, center.y)}
             />
 
             {hasToken ? (
@@ -136,49 +81,40 @@ export default function HexBoard({
             ) : null}
 
             {occupiedTrack ? (
-              <path
-                className="track-path"
-                d={getTrackPath(center.x, center.y, occupiedTrack.entryEdge, occupiedTrack.exitEdge)}
-                filter="url(#rail-shadow)"
-              />
+              <g transform={`rotate(${rotationForEntryEdge(occupiedTrack.entryEdge)} ${center.x} ${center.y})`}>
+                <path
+                  className="track-rail"
+                  d={railPaths?.left}
+                />
+                <path
+                  className="track-rail"
+                  d={railPaths?.right}
+                />
+              </g>
             ) : null}
 
-            {previewTarget ? (
-              <path
-                className="preview-path"
-                d={getTrackPath(center.x, center.y, game.frontier.entryEdge, previewTarget.exitEdge)}
-              />
+            {occupiedTrack ? (
+              <>
+                <line
+                  className={edgeBandClass(occupiedTrack.entryColor)}
+                  {...getEdgeSegment(HEX_RADIUS, center.x, center.y, occupiedTrack.entryEdge)}
+                />
+                <line
+                  className={edgeBandClass(occupiedTrack.exitColor)}
+                  {...getEdgeSegment(HEX_RADIUS, center.x, center.y, occupiedTrack.exitEdge)}
+                />
+              </>
             ) : null}
 
             {isFrontier ? (
               <>
-                <circle className={`frontier-pulse frontier-${game.frontier.requiredColor}`} cx={center.x} cy={center.y} r={18} />
-                <circle className={`frontier-core frontier-${game.frontier.requiredColor}`} cx={center.x} cy={center.y} r={8} />
+                <line
+                  className={edgeBandClass(game.frontier.requiredColor)}
+                  {...getEdgeSegment(HEX_RADIUS, center.x, center.y, game.frontier.entryEdge)}
+                />
               </>
             ) : null}
           </g>
-        )
-      })}
-
-      {Object.values(previews).map((preview) => {
-        if (!hoveredPreview || preview.tile.id !== hoveredPreview.tile.id || !preview.nextKey) {
-          return null
-        }
-
-        const nextCell = boardCellMap[preview.nextKey]
-        if (!nextCell) {
-          return null
-        }
-
-        const center = getHexCenter(nextCell.col, nextCell.row)
-        return (
-          <circle
-            className={`next-target ${getPreviewClass(preview)}`}
-            cx={center.x}
-            cy={center.y}
-            key={`${preview.tile.id}-next`}
-            r={10}
-          />
         )
       })}
     </svg>

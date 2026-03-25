@@ -2,23 +2,35 @@ import { startTransition, useEffect, useMemo, useState } from 'react'
 import { BrandBadge } from '@taylorvance/tv-shared-ui'
 import './App.css'
 import HexBoard from './components/HexBoard'
+import { SurveyTokenButton, TileChoiceButton } from './components/TileChoiceButton'
 import {
   DEFAULT_RULES,
   chooseTile,
   createGame,
   estimateBoardCellCount,
   estimateTokenCount,
-  getTileKindText,
   normalizeRules,
   previewMove,
   spendSurveyToken,
   type BoardShape,
   type MovePreview,
   type RulesConfig,
-  type Tile,
 } from './lib/game'
 
 type MobilePanel = 'play' | 'tune'
+
+function rollSeed(): number {
+  return Math.floor(Math.random() * 2147483647) + 1
+}
+
+function withFreshSeed(rules: RulesConfig): RulesConfig {
+  return {
+    ...rules,
+    seed: rollSeed(),
+  }
+}
+
+const INITIAL_RULES = withFreshSeed(DEFAULT_RULES)
 
 function formatShapeLabel(shape: BoardShape): string {
   switch (shape) {
@@ -31,52 +43,10 @@ function formatShapeLabel(shape: BoardShape): string {
   }
 }
 
-function describeTile(tile: Tile): string {
-  switch (tile.kind) {
-    case 'straight':
-      return 'Pushes directly ahead.'
-    case 'softLeft':
-      return 'Bends gently to the left.'
-    case 'softRight':
-      return 'Bends gently to the right.'
-    case 'hardLeft':
-      return 'Cuts sharply left.'
-    case 'hardRight':
-      return 'Cuts sharply right.'
-  }
-}
-
-function describePreview(preview: MovePreview): string {
-  if (preview.outcome === 'win') {
-    return preview.tokenGain > 0 ? 'Win, gain 1 token, and reach a goal space.' : 'Win by reaching a goal space.'
-  }
-
-  if (preview.outcome === 'loss') {
-    return `Lose: ${preview.reason}`
-  }
-
-  if (preview.tokenGain > 0) {
-    return `Continue and gain ${preview.tokenGain} token.`
-  }
-
-  return 'Continue safely.'
-}
-
-function previewTone(preview: MovePreview): string {
-  switch (preview.outcome) {
-    case 'win':
-      return 'option-outcome option-win'
-    case 'loss':
-      return 'option-outcome option-loss'
-    case 'continue':
-      return 'option-outcome option-safe'
-  }
-}
-
 function App() {
-  const [draftRules, setDraftRules] = useState<RulesConfig>(DEFAULT_RULES)
-  const [activeRules, setActiveRules] = useState<RulesConfig>(DEFAULT_RULES)
-  const [game, setGame] = useState(() => createGame(DEFAULT_RULES))
+  const [draftRules, setDraftRules] = useState<RulesConfig>(INITIAL_RULES)
+  const [activeRules, setActiveRules] = useState<RulesConfig>(INITIAL_RULES)
+  const [game, setGame] = useState(() => createGame(INITIAL_RULES))
   const [hoveredTileId, setHoveredTileId] = useState<string | null>(null)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('play')
   const [isMobileLayout, setIsMobileLayout] = useState(false)
@@ -109,7 +79,7 @@ function App() {
   }
 
   function applyDraftRules() {
-    const normalizedRules = normalizeRules(draftRules)
+    const normalizedRules = normalizeRules(withFreshSeed(draftRules))
     startTransition(() => {
       setActiveRules(normalizedRules)
       setDraftRules(normalizedRules)
@@ -119,7 +89,13 @@ function App() {
   }
 
   function handleNewGame() {
-    setGame(createGame(activeRules))
+    const nextRules = withFreshSeed(activeRules)
+    setActiveRules(nextRules)
+    setDraftRules((currentRules) => ({
+      ...currentRules,
+      seed: nextRules.seed,
+    }))
+    setGame(createGame(nextRules))
     setHoveredTileId(null)
   }
 
@@ -130,6 +106,7 @@ function App() {
 
   function handleSpendToken() {
     setGame((currentGame) => spendSurveyToken(currentGame))
+    setHoveredTileId(null)
   }
 
   return (
@@ -196,7 +173,54 @@ function App() {
                 </div>
               </div>
 
-              <HexBoard game={game} hoveredTileId={hoveredTileId} previews={previews} />
+              <HexBoard game={game} />
+
+              <div className="play-dock">
+                <div className="play-dock-header">
+                  <div>
+                    <p className="eyebrow">Turn</p>
+                    <h2>Tile Choices</h2>
+                  </div>
+                  <div className="option-toolbar">
+                    <span className="soft-pill">Tap a piece to lay it</span>
+                    <SurveyTokenButton
+                      disabled={game.status !== 'playing' || game.tokens <= 0}
+                      onClick={handleSpendToken}
+                      tokens={game.tokens}
+                    />
+                  </div>
+                </div>
+
+                <div className="option-grid">
+                  {game.offer.length === 0 ? (
+                    <p className="empty-state">
+                      {game.status === 'playing' ? 'No options loaded.' : 'Game over. Start a new game or apply new settings.'}
+                    </p>
+                  ) : (
+                    <>
+                      {game.offer.map((tile) => {
+                        const preview = previews[tile.id]
+
+                        return (
+                          <TileChoiceButton
+                            disabled={game.status !== 'playing'}
+                            entryEdge={game.frontier.entryEdge}
+                            hovered={hoveredTileId === tile.id}
+                            key={tile.id}
+                            onBlur={() => setHoveredTileId((current) => (current === tile.id ? null : current))}
+                            onChoose={() => handleChooseTile(tile.id)}
+                            onFocus={() => setHoveredTileId(tile.id)}
+                            onHoverEnd={() => setHoveredTileId((current) => (current === tile.id ? null : current))}
+                            onHoverStart={() => setHoveredTileId(tile.id)}
+                            preview={preview}
+                            requiredColor={game.frontier.requiredColor}
+                          />
+                        )
+                      })}
+                    </>
+                  )}
+                </div>
+              </div>
 
               <div aria-label="Board legend" className="board-legend">
                 <span className="legend-item">
@@ -214,55 +238,8 @@ function App() {
               </div>
 
               <p className="panel-note board-note">
-                Reach any highlighted goal space to win. The rules are unchanged; the goal is now shown directly on the board.
+                Reach any highlighted goal space to win.
               </p>
-            </section>
-
-            <section className="panel options-panel">
-              <div className="section-heading">
-                <div>
-                  <p className="eyebrow">Turn</p>
-                  <h2>Tile Choices</h2>
-                </div>
-                <div className="board-badges">
-                  <button
-                    className="button-secondary"
-                    disabled={game.status !== 'playing' || game.tokens <= 0 || game.surveyUsedThisTurn}
-                    onClick={handleSpendToken}
-                    type="button"
-                  >
-                    {game.surveyUsedThisTurn ? 'Survey used' : 'Hire surveyor'}
-                  </button>
-                </div>
-              </div>
-
-              <div className="option-grid">
-                {game.offer.length === 0 ? (
-                  <p className="empty-state">
-                    {game.status === 'playing' ? 'No options loaded.' : 'Game over. Start a new game or apply new settings.'}
-                  </p>
-                ) : (
-                  game.offer.map((tile) => {
-                    const preview = previews[tile.id]
-
-                    return (
-                      <button
-                        className="option-card"
-                        disabled={game.status !== 'playing'}
-                        key={tile.id}
-                        onClick={() => handleChooseTile(tile.id)}
-                        onMouseEnter={() => setHoveredTileId(tile.id)}
-                        onMouseLeave={() => setHoveredTileId((current) => (current === tile.id ? null : current))}
-                        type="button"
-                      >
-                        <span className="option-title">{getTileKindText(tile)}</span>
-                        <span className="option-copy">{describeTile(tile)}</span>
-                        <span className={previewTone(preview)}>{describePreview(preview)}</span>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
             </section>
 
             <section className="panel log-panel">
