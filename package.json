@@ -13,6 +13,7 @@
     "verify": "npm run lint && npm run test && npm run build"
   },
   "dependencies": {
+    "@taylorvance/tv-shared-runtime": "^0.4.0",
     "@taylorvance/tv-shared-ui": "^0.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

@@ -16,8 +16,7 @@ import {
   type MovePreview,
   type RulesConfig,
 } from './lib/game'
-
-type MobilePanel = 'play' | 'tune'
+import { loadPersistedAppState, savePersistedAppState } from './lib/persistence'
 
 function rollSeed(): number {
   return Math.floor(Math.random() * 2147483647) + 1
@@ -32,24 +31,28 @@ function withFreshSeed(rules: RulesConfig): RulesConfig {
 
 const INITIAL_RULES = withFreshSeed(DEFAULT_RULES)
 
-function formatShapeLabel(shape: BoardShape): string {
-  switch (shape) {
-    case 'symmetric':
-      return 'Symmetric'
-    case 'asymmetric-left':
-      return 'Asymmetric left'
-    case 'asymmetric-right':
-      return 'Asymmetric right'
+function createInitialAppState() {
+  const persistedState = loadPersistedAppState()
+  if (persistedState) {
+    return persistedState
+  }
+
+  return {
+    draftRules: INITIAL_RULES,
+    activeRules: INITIAL_RULES,
+    game: createGame(INITIAL_RULES),
+    showPlaytestControls: false,
   }
 }
 
 function App() {
-  const [draftRules, setDraftRules] = useState<RulesConfig>(INITIAL_RULES)
-  const [activeRules, setActiveRules] = useState<RulesConfig>(INITIAL_RULES)
-  const [game, setGame] = useState(() => createGame(INITIAL_RULES))
+  const [initialAppState] = useState(createInitialAppState)
+  const [draftRules, setDraftRules] = useState<RulesConfig>(initialAppState.draftRules)
+  const [activeRules, setActiveRules] = useState<RulesConfig>(initialAppState.activeRules)
+  const [game, setGame] = useState(initialAppState.game)
   const [hoveredTileId, setHoveredTileId] = useState<string | null>(null)
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel>('play')
   const [isMobileLayout, setIsMobileLayout] = useState(false)
+  const [showPlaytestControls, setShowPlaytestControls] = useState(initialAppState.showPlaytestControls)
 
   const previews = useMemo<Record<string, MovePreview>>(
     () => Object.fromEntries(game.offer.map((tile) => [tile.id, previewMove(game, tile)])),
@@ -70,6 +73,51 @@ function App() {
       mediaQuery.removeEventListener('change', syncLayout)
     }
   }, [])
+
+  useEffect(() => {
+    savePersistedAppState({
+      draftRules,
+      activeRules,
+      game,
+      showPlaytestControls,
+    })
+  }, [activeRules, draftRules, game, showPlaytestControls])
+
+  useEffect(() => {
+    if (!showPlaytestControls) {
+      return undefined
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setShowPlaytestControls(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [showPlaytestControls])
+
+  useEffect(() => {
+    if (!showPlaytestControls) {
+      return undefined
+    }
+
+    const { body } = document
+    const previousOverflow = body.style.overflow
+    const previousTouchAction = body.style.touchAction
+
+    body.style.overflow = 'hidden'
+    body.style.touchAction = 'none'
+
+    return () => {
+      body.style.overflow = previousOverflow
+      body.style.touchAction = previousTouchAction
+    }
+  }, [showPlaytestControls])
 
   function updateDraftRule<K extends keyof RulesConfig>(key: K, value: RulesConfig[K]) {
     setDraftRules((currentRules) => ({
@@ -109,6 +157,10 @@ function App() {
     setHoveredTileId(null)
   }
 
+  function togglePlaytestControls() {
+    setShowPlaytestControls((currentValue) => !currentValue)
+  }
+
   return (
     <div className="app-shell">
       <div className="rail-glow rail-glow-a" />
@@ -116,172 +168,170 @@ function App() {
 
       <header className="hero">
         <div className="hero-copy">
-          <p className="eyebrow">Prototype</p>
-          <h1>Traingame</h1>
-          <p className="hero-subtitle">
-            Forced-placement railway puzzle with a balance panel for every major lever.
-          </p>
-          <p className="hero-text">{game.statusMessage}</p>
-
-          <div className="hero-actions">
-            <button onClick={handleNewGame} type="button">New game</button>
-            <button className="button-secondary" onClick={applyDraftRules} type="button">
-              Apply settings
+          <div className="hero-topline">
+            <p className="eyebrow">Rail Puzzle</p>
+            <button
+              aria-label={showPlaytestControls ? 'Hide playtest controls' : 'Show playtest controls'}
+              className={showPlaytestControls ? 'settings-button settings-button-active' : 'settings-button'}
+              onClick={togglePlaytestControls}
+              type="button"
+            >
+              <svg aria-hidden="true" className="settings-icon" viewBox="0 0 24 24">
+                <path d="M4 7h16" />
+                <path d="M4 12h16" />
+                <path d="M4 17h16" />
+                <circle cx="9" cy="7" r="2.2" />
+                <circle cx="15" cy="12" r="2.2" />
+                <circle cx="11" cy="17" r="2.2" />
+              </svg>
             </button>
           </div>
 
-          <div className="pill-row">
-            <span className="pill">Turn {game.turnNumber}</span>
-            <span className="pill">Tokens {game.tokens}</span>
-            <span className="pill">{game.frontier.requiredColor} entry</span>
-            <span className="pill">{game.board.width} x {game.board.height}</span>
-            <span className="pill">{formatShapeLabel(game.board.shape)}</span>
+          <h1>Traingame</h1>
+          <p className="hero-subtitle">
+            Lay track from the bottom to any goal at the top.
+          </p>
+
+          <div className="hero-actions">
+            <button onClick={handleNewGame} type="button">New game</button>
+            {showPlaytestControls ? (
+              <button className="button-secondary" onClick={applyDraftRules} type="button">
+                Apply settings
+              </button>
+            ) : null}
           </div>
+
         </div>
       </header>
 
-      <nav className="mobile-panel-nav" aria-label="Mobile sections">
-        <button
-          className={mobilePanel === 'play' ? 'mobile-panel-tab active' : 'mobile-panel-tab'}
-          onClick={() => setMobilePanel('play')}
-          type="button"
-        >
-          Play
-        </button>
-        <button
-          className={mobilePanel === 'tune' ? 'mobile-panel-tab active' : 'mobile-panel-tab'}
-          onClick={() => setMobilePanel('tune')}
-          type="button"
-        >
-          Tune
-        </button>
-      </nav>
-
       <main className="main-layout">
-        {!isMobileLayout || mobilePanel === 'play' ? (
-          <section className="play-column">
-            <section className="panel board-panel">
-              <div className="section-heading">
+        <section className="play-column">
+          <section className="panel board-panel">
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Board</p>
+                <h2>Track</h2>
+              </div>
+            </div>
+
+            <HexBoard game={game} />
+
+            <div className="play-dock">
+              <div className="play-dock-header">
                 <div>
-                  <p className="eyebrow">Board</p>
-                  <h2>Track View</h2>
+                  <p className="eyebrow">Choices</p>
+                  <h2>Pick A Tile</h2>
                 </div>
-                <div className="board-badges">
-                  <span className={`status-pill status-${game.status}`}>{game.status}</span>
-                  <span className="soft-pill">Start {game.board.start.key}</span>
-                  <span className="soft-pill">Goal highlighted spaces</span>
-                </div>
-              </div>
-
-              <HexBoard game={game} />
-
-              <div className="play-dock">
-                <div className="play-dock-header">
-                  <div>
-                    <p className="eyebrow">Turn</p>
-                    <h2>Tile Choices</h2>
-                  </div>
-                  <div className="option-toolbar">
-                    <span className="soft-pill">Tap a piece to lay it</span>
-                    <SurveyTokenButton
-                      disabled={game.status !== 'playing' || game.tokens <= 0}
-                      onClick={handleSpendToken}
-                      tokens={game.tokens}
-                    />
-                  </div>
-                </div>
-
-                <div className="option-grid">
-                  {game.offer.length === 0 ? (
-                    <p className="empty-state">
-                      {game.status === 'playing' ? 'No options loaded.' : 'Game over. Start a new game or apply new settings.'}
-                    </p>
-                  ) : (
-                    <>
-                      {game.offer.map((tile) => {
-                        const preview = previews[tile.id]
-
-                        return (
-                          <TileChoiceButton
-                            disabled={game.status !== 'playing'}
-                            entryEdge={game.frontier.entryEdge}
-                            hovered={hoveredTileId === tile.id}
-                            key={tile.id}
-                            onBlur={() => setHoveredTileId((current) => (current === tile.id ? null : current))}
-                            onChoose={() => handleChooseTile(tile.id)}
-                            onFocus={() => setHoveredTileId(tile.id)}
-                            onHoverEnd={() => setHoveredTileId((current) => (current === tile.id ? null : current))}
-                            onHoverStart={() => setHoveredTileId(tile.id)}
-                            preview={preview}
-                            requiredColor={game.frontier.requiredColor}
-                          />
-                        )
-                      })}
-                    </>
-                  )}
+                <div className="option-toolbar">
+                  <SurveyTokenButton
+                    disabled={game.status !== 'playing' || game.tokens <= 0}
+                    onClick={handleSpendToken}
+                    tokens={game.tokens}
+                  />
                 </div>
               </div>
 
-              <div aria-label="Board legend" className="board-legend">
-                <span className="legend-item">
-                  <span aria-hidden="true" className="legend-swatch legend-goal" />
-                  Goal spaces
-                </span>
-                <span className="legend-item">
-                  <span aria-hidden="true" className="legend-swatch legend-token" />
-                  Tokens
-                </span>
-                <span className="legend-item">
-                  <span aria-hidden="true" className="legend-swatch legend-obstacle" />
-                  Obstacles
-                </span>
+              <div className="option-grid">
+                {game.offer.length === 0 ? (
+                  <p className="empty-state">
+                    {game.status === 'playing' ? 'No options loaded.' : 'Game over. Start a new game.'}
+                  </p>
+                ) : (
+                  <>
+                    {game.offer.map((tile) => {
+                      const preview = previews[tile.id]
+
+                      return (
+                        <TileChoiceButton
+                          disabled={game.status !== 'playing'}
+                          entryEdge={game.frontier.entryEdge}
+                          hovered={hoveredTileId === tile.id}
+                          key={tile.id}
+                          onBlur={() => setHoveredTileId((current) => (current === tile.id ? null : current))}
+                          onChoose={() => handleChooseTile(tile.id)}
+                          onFocus={() => setHoveredTileId(tile.id)}
+                          onHoverEnd={() => setHoveredTileId((current) => (current === tile.id ? null : current))}
+                          onHoverStart={() => setHoveredTileId(tile.id)}
+                          preview={preview}
+                          requiredColor={game.frontier.requiredColor}
+                        />
+                      )
+                    })}
+                  </>
+                )}
               </div>
+            </div>
+          </section>
 
-              <p className="panel-note board-note">
-                Reach any highlighted goal space to win.
-              </p>
-            </section>
-
+          {game.history.length > 0 ? (
             <section className="panel log-panel">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">Log</p>
+                  <p className="eyebrow">Run Log</p>
                   <h2>Recent Turns</h2>
                 </div>
               </div>
 
-              {game.history.length === 0 ? (
-                <p className="empty-state">No turns played yet.</p>
-              ) : (
-                <ol className="turn-list">
-                  {game.history.map((turn) => (
-                    <li className="turn-item" key={`${turn.turnNumber}-${turn.targetKey}`}>
-                      <strong>Turn {turn.turnNumber}.</strong> {turn.summary}
-                    </li>
-                  ))}
-                </ol>
-              )}
+              <ol className="turn-list">
+                {game.history.map((turn) => (
+                  <li className="turn-item" key={`${turn.turnNumber}-${turn.targetKey}`}>
+                    <strong>Turn {turn.turnNumber}.</strong> {turn.summary}
+                  </li>
+                ))}
+              </ol>
             </section>
-          </section>
-        ) : null}
+          ) : null}
+        </section>
+      </main>
 
-        {!isMobileLayout || mobilePanel === 'tune' ? (
-          <aside className="sidebar">
-            <section className="panel controls-panel">
-              <div className="section-heading">
+      {showPlaytestControls ? (
+        <>
+          <button
+            aria-label="Close playtest controls"
+            className="lab-backdrop"
+            onClick={() => setShowPlaytestControls(false)}
+            type="button"
+          />
+          <aside
+            aria-label="Playtest controls"
+            className={isMobileLayout ? 'lab-panel lab-panel-mobile' : 'lab-panel lab-panel-desktop'}
+          >
+            <div className="lab-panel-inner">
+              <div className="lab-handle" />
+
+              <div className="lab-header">
                 <div>
-                  <p className="eyebrow">Balance</p>
+                  <p className="eyebrow">Lab</p>
                   <h2>Playtest Controls</h2>
                 </div>
-                <span className={draftChanged ? 'soft-pill soft-pill-alert' : 'soft-pill'}>
-                  {draftChanged ? 'Pending changes' : 'In sync'}
-                </span>
+                <div className="lab-header-actions">
+                  <span className={draftChanged ? 'soft-pill soft-pill-alert' : 'soft-pill'}>
+                    {draftChanged ? 'Pending changes' : 'In sync'}
+                  </span>
+                  <button
+                    aria-label="Close playtest controls"
+                    className="settings-button"
+                    onClick={() => setShowPlaytestControls(false)}
+                    type="button"
+                  >
+                    <svg aria-hidden="true" className="settings-icon" viewBox="0 0 24 24">
+                      <path d="M6 6l12 12" />
+                      <path d="M18 6L6 18" />
+                    </svg>
+                  </button>
+                </div>
               </div>
 
-              <p className="panel-note">
-                Every balancing lever from the design doc is exposed here. Change them mid-session,
-                then apply them to start a fresh board with those settings.
-              </p>
+              <div className="control-actions">
+                <button onClick={applyDraftRules} type="button">Apply + new game</button>
+                <button
+                  className="button-secondary"
+                  onClick={() => setDraftRules(activeRules)}
+                  type="button"
+                >
+                  Revert draft
+                </button>
+              </div>
 
               <div className="control-group">
                 <p className="group-label">Core</p>
@@ -422,21 +472,10 @@ function App() {
                   <strong>{draftRules.obstacleCount}</strong>
                 </article>
               </div>
-
-              <div className="control-actions">
-                <button onClick={applyDraftRules} type="button">Apply + new game</button>
-                <button
-                  className="button-secondary"
-                  onClick={() => setDraftRules(activeRules)}
-                  type="button"
-                >
-                  Revert draft
-                </button>
-              </div>
-            </section>
+            </div>
           </aside>
-        ) : null}
-      </main>
+        </>
+      ) : null}
 
       <footer className="app-footer">
         <BrandBadge

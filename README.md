@@ -21,6 +21,20 @@ Useful scripts:
 - `npm run build`
 - `npm run verify`
 
+## Deploy
+
+GitHub Pages deployment follows the shared `tv-shared` consumer standard:
+
+- CI runs through `.github/workflows/ci.yml`
+- Pages deploy runs through `.github/workflows/deploy-pages.yml`
+
+The Vite base path auto-detects the repository name during GitHub Actions builds, so the app can
+deploy to a standard project Pages URL without a custom build override. You can still override it
+manually with `VITE_BASE_PATH` if needed.
+
+The app also now uses `@taylorvance/tv-shared-runtime` for project-scoped local persistence, so
+the current run and playtest settings can survive refreshes without colliding with other local apps.
+
 ## Docs
 
 - [Design Doc](docs/design.md)
