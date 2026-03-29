@@ -14,14 +14,16 @@ import {
   estimateFeatureCount,
   estimateObstacleCount,
   estimateTokenCount,
+  getRecommendedTileCounts,
   normalizeRules,
   previewMove,
   spendSurveyToken,
-  type BoardShape,
   type MovePreview,
   type RulesConfig,
+  type Tile,
 } from './lib/game';
 import {
+  clearPersistedAppState,
   loadPersistedAppState,
   savePersistedAppState,
 } from './lib/persistence';
@@ -53,6 +55,35 @@ function createInitialAppState() {
   };
 }
 
+function createDefaultAppState() {
+  const defaultRules = withFreshSeed(DEFAULT_RULES);
+
+  return {
+    draftRules: defaultRules,
+    activeRules: defaultRules,
+    game: createGame(defaultRules),
+    showPlaytestControls: false,
+  };
+}
+
+function getBagCounts(tiles: Tile[]) {
+  return tiles.reduce(
+    (counts, tile) => {
+      if (tile.kind === 'straight') {
+        counts.straight += 1;
+      } else if (tile.kind === 'softLeft' || tile.kind === 'softRight') {
+        counts.soft += 1;
+      } else {
+        counts.hard += 1;
+      }
+
+      counts.total += 1;
+      return counts;
+    },
+    { straight: 0, soft: 0, hard: 0, total: 0 },
+  );
+}
+
 function App() {
   const [initialAppState] = useState(createInitialAppState);
   const [draftRules, setDraftRules] = useState<RulesConfig>(
@@ -79,6 +110,7 @@ function App() {
   const estimatedFeatures = estimateFeatureCount(draftRules);
   const estimatedTokens = estimateTokenCount(draftRules);
   const estimatedCells = estimateBoardCellCount(draftRules);
+  const bagCounts = getBagCounts(game.deck);
   const draftChanged =
     JSON.stringify(normalizeRules(draftRules)) !== JSON.stringify(activeRules);
 
@@ -143,9 +175,58 @@ function App() {
     key: K,
     value: RulesConfig[K],
   ) {
+    setDraftRules((currentRules) => {
+      const nextRules = {
+        ...currentRules,
+        [key]: value,
+      };
+
+      if (
+        key !== 'boardWidth' &&
+        key !== 'boardHeight' &&
+        key !== 'boardShape'
+      ) {
+        return nextRules;
+      }
+
+      const currentRecommendedCounts = getRecommendedTileCounts(
+        currentRules.boardWidth,
+        currentRules.boardHeight,
+        currentRules.boardShape,
+      );
+      const usesRecommendedCounts =
+        currentRules.straightWeight ===
+          currentRecommendedCounts.straightWeight &&
+        currentRules.softWeight === currentRecommendedCounts.softWeight &&
+        currentRules.hardWeight === currentRecommendedCounts.hardWeight;
+
+      if (!usesRecommendedCounts) {
+        return nextRules;
+      }
+
+      return {
+        ...nextRules,
+        ...getRecommendedTileCounts(
+          nextRules.boardWidth,
+          nextRules.boardHeight,
+          nextRules.boardShape,
+        ),
+      };
+    });
+  }
+
+  function nudgeDraftRule<K extends keyof RulesConfig>(
+    key: K,
+    delta: number,
+    min: number,
+    max: number,
+  ) {
     setDraftRules((currentRules) => ({
       ...currentRules,
-      [key]: value,
+      [key]: Math.max(
+        min,
+        Math.min(max, Number(currentRules[key]) + delta),
+      ) as RulesConfig[K],
     }));
   }
 
@@ -168,6 +249,16 @@ function App() {
     }));
     setGame(createGame(nextRules));
     setHoveredTileId(null);
+  }
+
+  function handleResetDefaults() {
+    const defaultAppState = createDefaultAppState();
+    clearPersistedAppState();
+    setDraftRules(defaultAppState.draftRules);
+    setActiveRules(defaultAppState.activeRules);
+    setGame(defaultAppState.game);
+    setHoveredTileId(null);
+    setShowPlaytestControls(false);
   }
 
   function handleChooseTile(tileId: string) {
@@ -310,6 +401,38 @@ function App() {
           </div>
 
           <div className="playbar">
+            <div className="playbar-meta">
+              <div
+                aria-label={`Bag has ${bagCounts.total} tiles remaining: ${bagCounts.straight} straight, ${bagCounts.soft} soft-turn, ${bagCounts.hard} hard-turn.`}
+                className="bag-indicator"
+              >
+                <span className="bag-indicator-label">Bag</span>
+                <strong className="bag-indicator-total">
+                  {bagCounts.total}
+                </strong>
+                <div aria-hidden="true" className="bag-indicator-bar">
+                  <span
+                    className="bag-indicator-segment bag-indicator-segment-straight"
+                    style={{
+                      width: `${bagCounts.total > 0 ? (bagCounts.straight / bagCounts.total) * 100 : 0}%`,
+                    }}
+                  />
+                  <span
+                    className="bag-indicator-segment bag-indicator-segment-soft"
+                    style={{
+                      width: `${bagCounts.total > 0 ? (bagCounts.soft / bagCounts.total) * 100 : 0}%`,
+                    }}
+                  />
+                  <span
+                    className="bag-indicator-segment bag-indicator-segment-hard"
+                    style={{
+                      width: `${bagCounts.total > 0 ? (bagCounts.hard / bagCounts.total) * 100 : 0}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="playbar-option-grid">
               {renderTileChoices(isMobileLayout)}
             </div>
@@ -408,6 +531,13 @@ function App() {
                 >
                   Revert draft
                 </button>
+                <button
+                  className="button-secondary"
+                  onClick={handleResetDefaults}
+                  type="button"
+                >
+                  Reset to defaults
+                </button>
               </div>
 
               <div className="control-group">
@@ -417,10 +547,11 @@ function App() {
                   <span>Board width</span>
                   <input
                     max={9}
-                    min={4}
+                    min={5}
                     onChange={(event) =>
                       updateDraftRule('boardWidth', Number(event.target.value))
                     }
+                    step={2}
                     type="range"
                     value={draftRules.boardWidth}
                   />
@@ -458,71 +589,86 @@ function App() {
                   <strong>{draftRules.startingTokens}</strong>
                 </label>
 
-                <label className="control-row">
-                  <span>Straight weight</span>
-                  <input
-                    max={10}
-                    min={0}
-                    onChange={(event) =>
-                      updateDraftRule(
-                        'straightWeight',
-                        Number(event.target.value),
-                      )
-                    }
-                    type="range"
-                    value={draftRules.straightWeight}
-                  />
-                  <strong>{draftRules.straightWeight}</strong>
+                <label className="stepper-row">
+                  <span>Straight tiles</span>
+                  <div className="stepper-control">
+                    <button
+                      aria-label="Decrease straight tiles"
+                      className="stepper-button"
+                      disabled={draftRules.straightWeight <= 0}
+                      onClick={() =>
+                        nudgeDraftRule('straightWeight', -1, 0, 24)
+                      }
+                      type="button"
+                    >
+                      -
+                    </button>
+                    <strong>{draftRules.straightWeight}</strong>
+                    <button
+                      aria-label="Increase straight tiles"
+                      className="stepper-button"
+                      disabled={draftRules.straightWeight >= 24}
+                      onClick={() => nudgeDraftRule('straightWeight', 1, 0, 24)}
+                      type="button"
+                    >
+                      +
+                    </button>
+                  </div>
                 </label>
 
-                <label className="control-row">
-                  <span>Soft-turn weight</span>
-                  <input
-                    max={10}
-                    min={0}
-                    onChange={(event) =>
-                      updateDraftRule('softWeight', Number(event.target.value))
-                    }
-                    type="range"
-                    value={draftRules.softWeight}
-                  />
-                  <strong>{draftRules.softWeight}</strong>
+                <label className="stepper-row">
+                  <span>Soft-turn tiles</span>
+                  <div className="stepper-control">
+                    <button
+                      aria-label="Decrease soft-turn tiles"
+                      className="stepper-button"
+                      disabled={draftRules.softWeight <= 0}
+                      onClick={() => nudgeDraftRule('softWeight', -1, 0, 24)}
+                      type="button"
+                    >
+                      -
+                    </button>
+                    <strong>{draftRules.softWeight}</strong>
+                    <button
+                      aria-label="Increase soft-turn tiles"
+                      className="stepper-button"
+                      disabled={draftRules.softWeight >= 24}
+                      onClick={() => nudgeDraftRule('softWeight', 1, 0, 24)}
+                      type="button"
+                    >
+                      +
+                    </button>
+                  </div>
                 </label>
 
-                <label className="control-row">
-                  <span>Hard-turn weight</span>
-                  <input
-                    max={10}
-                    min={0}
-                    onChange={(event) =>
-                      updateDraftRule('hardWeight', Number(event.target.value))
-                    }
-                    type="range"
-                    value={draftRules.hardWeight}
-                  />
-                  <strong>{draftRules.hardWeight}</strong>
+                <label className="stepper-row">
+                  <span>Hard-turn tiles</span>
+                  <div className="stepper-control">
+                    <button
+                      aria-label="Decrease hard-turn tiles"
+                      className="stepper-button"
+                      disabled={draftRules.hardWeight <= 0}
+                      onClick={() => nudgeDraftRule('hardWeight', -1, 0, 24)}
+                      type="button"
+                    >
+                      -
+                    </button>
+                    <strong>{draftRules.hardWeight}</strong>
+                    <button
+                      aria-label="Increase hard-turn tiles"
+                      className="stepper-button"
+                      disabled={draftRules.hardWeight >= 24}
+                      onClick={() => nudgeDraftRule('hardWeight', 1, 0, 24)}
+                      type="button"
+                    >
+                      +
+                    </button>
+                  </div>
                 </label>
               </div>
 
               <div className="control-group">
                 <p className="group-label">Structural</p>
-
-                <label className="select-row">
-                  <span>Board shape</span>
-                  <select
-                    onChange={(event) =>
-                      updateDraftRule(
-                        'boardShape',
-                        event.target.value as BoardShape,
-                      )
-                    }
-                    value={draftRules.boardShape}
-                  >
-                    <option value="symmetric">Symmetric</option>
-                    <option value="asymmetric-left">Asymmetric left</option>
-                    <option value="asymmetric-right">Asymmetric right</option>
-                  </select>
-                </label>
 
                 <label className="control-row">
                   <span>Features</span>

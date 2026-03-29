@@ -135,8 +135,8 @@ describe('app persistence', () => {
     const restored = loadPersistedAppState(storage);
 
     expect(restored).not.toBeNull();
-    expect(restored?.activeRules.featureDensityPercent).toBe(27);
-    expect(restored?.activeRules.hazardBalancePercent).toBe(42);
+    expect(restored?.activeRules.featureDensityPercent).toBe(24);
+    expect(restored?.activeRules.hazardBalancePercent).toBe(34);
     expect(restored?.draftRules.featureDensityPercent).toBe(20);
     expect(restored?.draftRules.hazardBalancePercent).toBe(50);
   });

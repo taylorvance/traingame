@@ -96,22 +96,41 @@ export interface MovePreview {
 
 const DEFAULT_SEED = 4317;
 const START_ENTRY_EDGE: Edge = 3;
+const DEFAULT_BOARD_WIDTH = 7;
+const DEFAULT_BOARD_HEIGHT = 8;
+const DEFAULT_STRAIGHT_TILES = 4;
+const DEFAULT_SOFT_TILES = 10;
+const DEFAULT_HARD_TILES = 8;
 
 export const DEFAULT_RULES: RulesConfig = {
-  boardWidth: 6,
-  boardHeight: 7,
+  boardWidth: DEFAULT_BOARD_WIDTH,
+  boardHeight: DEFAULT_BOARD_HEIGHT,
   boardShape: 'symmetric',
   featureDensityPercent: 18,
   hazardBalancePercent: 50,
   startingTokens: 1,
-  straightWeight: 4,
-  softWeight: 5,
-  hardWeight: 3,
+  straightWeight: DEFAULT_STRAIGHT_TILES,
+  softWeight: DEFAULT_SOFT_TILES,
+  hardWeight: DEFAULT_HARD_TILES,
   seed: DEFAULT_SEED,
 };
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function clampOdd(value: number, min: number, max: number): number {
+  const clamped = clamp(Math.round(value), min, max);
+
+  if (clamped % 2 === 1) {
+    return clamped;
+  }
+
+  if (clamped >= max) {
+    return Math.max(min, clamped - 1);
+  }
+
+  return Math.min(max, clamped + 1);
 }
 
 function cellKey(col: number, row: number): string {
@@ -233,6 +252,49 @@ function buildBoard(rules: RulesConfig): BoardState {
   };
 }
 
+function roundToNearestEven(value: number, min: number, max: number): number {
+  const rounded = Math.round(value / 2) * 2;
+  const clamped = clamp(rounded, min, max);
+
+  if (clamped % 2 === 0) {
+    return clamped;
+  }
+
+  if (clamped === max) {
+    return Math.max(min, clamped - 1);
+  }
+
+  return Math.min(max, clamped + 1);
+}
+
+export function getRecommendedTileCounts(
+  boardWidth: number,
+  boardHeight: number,
+  boardShape: BoardShape,
+): Pick<RulesConfig, 'straightWeight' | 'softWeight' | 'hardWeight'> {
+  const baselineBoard = buildBoard({
+    ...DEFAULT_RULES,
+    boardWidth: DEFAULT_BOARD_WIDTH,
+    boardHeight: DEFAULT_BOARD_HEIGHT,
+    boardShape: 'symmetric',
+  });
+  const targetBoard = buildBoard({
+    ...DEFAULT_RULES,
+    boardWidth,
+    boardHeight,
+    boardShape,
+  });
+  const scale = Math.sqrt(
+    targetBoard.cells.length / baselineBoard.cells.length,
+  );
+
+  return {
+    straightWeight: clamp(Math.round(DEFAULT_STRAIGHT_TILES * scale), 1, 24),
+    softWeight: roundToNearestEven(DEFAULT_SOFT_TILES * scale, 2, 24),
+    hardWeight: roundToNearestEven(DEFAULT_HARD_TILES * scale, 2, 24),
+  };
+}
+
 function getFeatureCells(board: BoardState): Cell[] {
   return board.cells.filter(
     (cell) => cell.key !== board.start.key && cell.row !== 0,
@@ -276,132 +338,94 @@ function getPlacementProfile(
   };
 }
 
-function fillPoolCount(
-  weight: number,
-  totalWeight: number,
-  totalTiles: number,
-): number {
-  if (weight <= 0 || totalWeight <= 0) {
-    return 0;
+function splitTurnTileCount(
+  totalCount: number,
+  state: number,
+): [number, number, number] {
+  const baseCount = Math.floor(totalCount / 2);
+
+  if (totalCount % 2 === 0) {
+    return [baseCount, baseCount, state];
   }
 
-  return Math.max(1, Math.round((weight / totalWeight) * totalTiles));
+  const [extraIndex, nextState] = randomIndex(2, state);
+  return extraIndex === 0
+    ? [baseCount + 1, baseCount, nextState]
+    : [baseCount, baseCount + 1, nextState];
 }
 
 function createTileBatch(
   rules: RulesConfig,
-  totalTiles: number,
   nextTileSerial: number,
   state: number,
 ): [Tile[], number, number] {
-  const totalWeight =
-    rules.straightWeight + rules.softWeight + rules.hardWeight;
-  const safeTotalWeight = totalWeight > 0 ? totalWeight : 1;
-  const straightCount = fillPoolCount(
-    rules.straightWeight,
-    safeTotalWeight,
-    totalTiles,
-  );
-  const softCount = fillPoolCount(
-    rules.softWeight,
-    safeTotalWeight,
-    totalTiles,
-  );
-  const hardCount = fillPoolCount(
-    rules.hardWeight,
-    safeTotalWeight,
-    totalTiles,
-  );
+  const straightCount = rules.straightWeight;
+  const softCount = rules.softWeight;
+  const hardCount = rules.hardWeight;
   const tiles: Tile[] = [];
   let serial = nextTileSerial;
+  let nextState = state;
+  const [softLeftCount, softRightCount, softState] = splitTurnTileCount(
+    softCount,
+    nextState,
+  );
+  nextState = softState;
+  const [hardLeftCount, hardRightCount, hardState] = splitTurnTileCount(
+    hardCount,
+    nextState,
+  );
+  nextState = hardState;
 
   for (let count = 0; count < straightCount; count += 1) {
     tiles.push({ id: `tile-${serial}`, kind: 'straight' });
     serial += 1;
   }
 
-  for (let count = 0; count < softCount; count += 1) {
+  for (let count = 0; count < softLeftCount; count += 1) {
     tiles.push({
       id: `tile-${serial}`,
-      kind: count % 2 === 0 ? 'softLeft' : 'softRight',
+      kind: 'softLeft',
     });
     serial += 1;
   }
 
-  for (let count = 0; count < hardCount; count += 1) {
+  for (let count = 0; count < softRightCount; count += 1) {
     tiles.push({
       id: `tile-${serial}`,
-      kind: count % 2 === 0 ? 'hardLeft' : 'hardRight',
+      kind: 'softRight',
     });
     serial += 1;
   }
 
-  while (tiles.length < totalTiles) {
-    tiles.push({ id: `tile-${serial}`, kind: 'straight' });
+  for (let count = 0; count < hardLeftCount; count += 1) {
+    tiles.push({
+      id: `tile-${serial}`,
+      kind: 'hardLeft',
+    });
     serial += 1;
   }
 
-  const [shuffledTiles, nextState] = shuffleTiles(tiles, state);
-  return [shuffledTiles, serial, nextState];
-}
-
-function topUpDeck(
-  deck: Tile[],
-  rules: RulesConfig,
-  boardCellCount: number,
-  nextTileSerial: number,
-  state: number,
-): [Tile[], number, number] {
-  if (deck.length >= 6) {
-    return [deck, nextTileSerial, state];
+  for (let count = 0; count < hardRightCount; count += 1) {
+    tiles.push({
+      id: `tile-${serial}`,
+      kind: 'hardRight',
+    });
+    serial += 1;
   }
 
-  const batchSize = Math.max(18, boardCellCount * 2);
-  const [extraTiles, nextSerial, nextState] = createTileBatch(
-    rules,
-    batchSize,
-    nextTileSerial,
-    state,
-  );
-  return [[...deck, ...extraTiles], nextSerial, nextState];
+  const [shuffledTiles, shuffledState] = shuffleTiles(tiles, nextState);
+  return [shuffledTiles, serial, shuffledState];
 }
 
 function drawTiles(
   deck: Tile[],
   count: number,
-  rules: RulesConfig,
-  boardCellCount: number,
+  _rules: RulesConfig,
+  _boardCellCount: number,
   nextTileSerial: number,
   state: number,
 ): [Tile[], Tile[], number, number] {
-  let workingDeck = deck;
-  let serial = nextTileSerial;
-  let nextState = state;
-
-  [workingDeck, serial, nextState] = topUpDeck(
-    workingDeck,
-    rules,
-    boardCellCount,
-    serial,
-    nextState,
-  );
-
-  if (workingDeck.length < count) {
-    [workingDeck, serial, nextState] = topUpDeck(
-      [],
-      rules,
-      boardCellCount,
-      serial,
-      nextState,
-    );
-  }
-
-  return [
-    workingDeck.slice(count),
-    workingDeck.slice(0, count),
-    serial,
-    nextState,
-  ];
+  return [deck.slice(count), deck.slice(0, count), nextTileSerial, state];
 }
 
 function returnTilesToDeck(
@@ -593,9 +617,9 @@ export function getExitEdge(entryEdge: Edge, tileKind: TileKind): Edge {
 
 export function normalizeRules(rules: RulesConfig): RulesConfig {
   const nextRules = {
-    boardWidth: clamp(Math.round(rules.boardWidth), 4, 9),
+    boardWidth: clampOdd(rules.boardWidth, 5, 9),
     boardHeight: clamp(Math.round(rules.boardHeight), 4, 11),
-    boardShape: rules.boardShape,
+    boardShape: 'symmetric' as BoardShape,
     featureDensityPercent: clamp(
       Math.round(rules.featureDensityPercent),
       0,
@@ -603,9 +627,9 @@ export function normalizeRules(rules: RulesConfig): RulesConfig {
     ),
     hazardBalancePercent: clamp(Math.round(rules.hazardBalancePercent), 0, 100),
     startingTokens: clamp(Math.round(rules.startingTokens), 0, 5),
-    straightWeight: clamp(Math.round(rules.straightWeight), 0, 10),
-    softWeight: clamp(Math.round(rules.softWeight), 0, 10),
-    hardWeight: clamp(Math.round(rules.hardWeight), 0, 10),
+    straightWeight: clamp(Math.round(rules.straightWeight), 0, 24),
+    softWeight: clamp(Math.round(rules.softWeight), 0, 24),
+    hardWeight: clamp(Math.round(rules.hardWeight), 0, 24),
     seed: Math.round(rules.seed) || DEFAULT_SEED,
   } satisfies RulesConfig;
 
@@ -802,13 +826,18 @@ export function createGame(inputRules: RulesConfig): GameState {
     rules,
     rules.seed >>> 0,
   );
-  const [initialDeck, initialOffer, nextTileSerial, rngState] = drawTiles(
-    [],
+  const [bagDeck, nextTileSerial, rngState] = createTileBatch(
+    rules,
+    1,
+    featureState,
+  );
+  const [initialDeck, initialOffer] = drawTiles(
+    bagDeck,
     2,
     rules,
     board.cells.length,
-    1,
-    featureState,
+    nextTileSerial,
+    rngState,
   );
 
   return {
@@ -849,6 +878,13 @@ export function spendSurveyToken(game: GameState): GameState {
     game.nextTileSerial,
     game.rngState,
   );
+
+  if (extraTiles.length === 0) {
+    return {
+      ...game,
+      statusMessage: 'No more track tiles remain in the bag.',
+    };
+  }
 
   return {
     ...game,
@@ -962,6 +998,18 @@ export function chooseTile(game: GameState, tileId: string): GameState {
   };
 
   const nextTurnOffer = drawNextTurnOffer(provisionalGame);
+  if (nextTurnOffer.offer.length === 0) {
+    return {
+      ...provisionalGame,
+      deck: nextTurnOffer.deck,
+      offer: [],
+      nextTileSerial: nextTurnOffer.nextTileSerial,
+      rngState: nextTurnOffer.rngState,
+      status: 'lost',
+      statusMessage: 'Ran out of track tiles.',
+    };
+  }
+
   return {
     ...provisionalGame,
     ...nextTurnOffer,

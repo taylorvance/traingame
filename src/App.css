@@ -352,6 +352,60 @@
   margin-top: 0.6rem;
 }
 
+.playbar-meta {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.bag-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.28rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(41, 35, 24, 0.08);
+  background: rgba(255, 252, 244, 0.72);
+  color: var(--muted);
+}
+
+.bag-indicator-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bag-indicator-total {
+  min-width: 1.6rem;
+  text-align: center;
+  color: var(--ink);
+}
+
+.bag-indicator-bar {
+  display: flex;
+  overflow: hidden;
+  width: 3.5rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(41, 35, 24, 0.08);
+}
+
+.bag-indicator-segment {
+  height: 100%;
+}
+
+.bag-indicator-segment-straight {
+  background: rgba(36, 96, 90, 0.86);
+}
+
+.bag-indicator-segment-soft {
+  background: rgba(217, 171, 67, 0.9);
+}
+
+.bag-indicator-segment-hard {
+  background: rgba(180, 86, 62, 0.9);
+}
+
 .playbar-option-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(8.4rem, 1fr));
@@ -735,6 +789,37 @@
   white-space: nowrap;
 }
 
+.stepper-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.stepper-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.stepper-control strong {
+  min-width: 2ch;
+  text-align: center;
+}
+
+.stepper-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(36, 96, 90, 0.11);
+  color: var(--ink);
+  border-color: rgba(36, 96, 90, 0.16);
+}
+
 .select-row select,
 .number-row input {
   width: 100%;
@@ -830,6 +915,10 @@
     gap: 0.42rem;
   }
 
+  .app-shell-mobile .bag-indicator {
+    padding: 0.24rem 0.44rem;
+  }
+
   .app-shell-mobile .playbar-option-grid {
     grid-template-columns: repeat(auto-fit, minmax(4.15rem, 1fr));
     gap: 0.42rem;
@@ -863,6 +952,10 @@
 
   .control-row > strong {
     grid-area: value;
+  }
+
+  .stepper-row {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .app-shell-mobile .hex-board {

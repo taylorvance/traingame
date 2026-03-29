@@ -3,6 +3,7 @@ import {
   DEFAULT_RULES,
   chooseTile,
   createGame,
+  getRecommendedTileCounts,
   normalizeRules,
   previewMove,
   spendSurveyToken,
@@ -24,14 +25,14 @@ function hexDistanceFromKeys(a: string, b: string): number {
 }
 
 describe('normalizeRules', () => {
-  it('clamps values and restores tile weights when all are zero', () => {
+  it('clamps values and restores tile counts when all are zero', () => {
     const rules = normalizeRules({
       ...DEFAULT_RULES,
       boardWidth: 30,
       boardHeight: 1,
       featureDensityPercent: 99,
       hazardBalancePercent: 140,
-      straightWeight: 0,
+      straightWeight: 40,
       softWeight: 0,
       hardWeight: 0,
     });
@@ -40,9 +41,74 @@ describe('normalizeRules', () => {
     expect(rules.boardHeight).toBe(4);
     expect(rules.featureDensityPercent).toBe(40);
     expect(rules.hazardBalancePercent).toBe(100);
+    expect(rules.straightWeight).toBe(24);
+  });
+
+  it('restores default tile counts when all are zero', () => {
+    const rules = normalizeRules({
+      ...DEFAULT_RULES,
+      straightWeight: 0,
+      softWeight: 0,
+      hardWeight: 0,
+    });
+
     expect(
       rules.straightWeight + rules.softWeight + rules.hardWeight,
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('recommended tile counts', () => {
+  it('matches the tuned baseline for the default board', () => {
+    expect(getRecommendedTileCounts(7, 8, 'symmetric')).toEqual({
+      straightWeight: 4,
+      softWeight: 10,
+      hardWeight: 8,
+    });
+  });
+
+  it('scales up on larger boards without overreacting to one extra row', () => {
+    expect(getRecommendedTileCounts(7, 9, 'symmetric')).toEqual({
+      straightWeight: 4,
+      softWeight: 10,
+      hardWeight: 8,
+    });
+    expect(getRecommendedTileCounts(9, 11, 'symmetric')).toEqual({
+      straightWeight: 5,
+      softWeight: 14,
+      hardWeight: 10,
+    });
+  });
+});
+
+describe('tile bag composition', () => {
+  it('splits odd soft and hard counts across left and right variants without exceeding a one-tile difference', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      straightWeight: 0,
+      softWeight: 5,
+      hardWeight: 5,
+      featureDensityPercent: 0,
+      seed: 11,
+    });
+    const allTiles = [...game.offer, ...game.deck];
+    const softLeftCount = allTiles.filter(
+      (tile) => tile.kind === 'softLeft',
+    ).length;
+    const softRightCount = allTiles.filter(
+      (tile) => tile.kind === 'softRight',
+    ).length;
+    const hardLeftCount = allTiles.filter(
+      (tile) => tile.kind === 'hardLeft',
+    ).length;
+    const hardRightCount = allTiles.filter(
+      (tile) => tile.kind === 'hardRight',
+    ).length;
+
+    expect(softLeftCount + softRightCount).toBe(5);
+    expect(hardLeftCount + hardRightCount).toBe(5);
+    expect(Math.abs(softLeftCount - softRightCount)).toBe(1);
+    expect(Math.abs(hardLeftCount - hardRightCount)).toBe(1);
   });
 });
 
@@ -60,6 +126,28 @@ describe('survey flow', () => {
     expect(surveyedTwice.tokens).toBe(game.tokens - 2);
     expect(surveyedTwice.offer).toHaveLength(6);
     expect(surveyedTwice.surveyUsedThisTurn).toBe(false);
+  });
+
+  it('does not spend a token if the bag is empty', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      straightWeight: 1,
+      softWeight: 0,
+      hardWeight: 0,
+      startingTokens: 2,
+      featureDensityPercent: 0,
+      seed: 11,
+    });
+
+    expect(game.deck).toHaveLength(0);
+
+    const nextGame = spendSurveyToken(game);
+
+    expect(nextGame.tokens).toBe(game.tokens);
+    expect(nextGame.status).toBe('playing');
+    expect(nextGame.statusMessage).toBe(
+      'No more track tiles remain in the bag.',
+    );
   });
 });
 
@@ -165,6 +253,24 @@ describe('move resolution', () => {
     expect(placedTrack?.exitColor).toBe('blue');
   });
 
+  it('loses when the bag runs out before the next turn offer can be dealt', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      straightWeight: 1,
+      softWeight: 0,
+      hardWeight: 0,
+      featureDensityPercent: 0,
+      seed: 11,
+    });
+
+    expect(game.offer).toHaveLength(1);
+
+    const nextGame = chooseTile(game, game.offer[0]!.id);
+
+    expect(nextGame.status).toBe('lost');
+    expect(nextGame.statusMessage).toBe('Ran out of track tiles.');
+  });
+
   it('collects tokens immediately on pickup', () => {
     const game = createGame({
       ...DEFAULT_RULES,
@@ -232,7 +338,7 @@ describe('move resolution', () => {
       featureDensityPercent: 0,
       seed: 11,
     });
-    const approachCell = game.board.cells.find((cell) => cell.row === 1);
+    const approachCells = game.board.cells.filter((cell) => cell.row === 1);
     const candidateTiles = [
       { id: 'straight', kind: 'straight' as const },
       { id: 'soft-left', kind: 'softLeft' as const },
@@ -242,27 +348,33 @@ describe('move resolution', () => {
     ];
     const edges = [0, 1, 2, 3, 4, 5] as const;
 
-    expect(approachCell).toBeDefined();
+    expect(approachCells.length).toBeGreaterThan(0);
 
     let winningTile: (typeof candidateTiles)[number] | undefined;
     let goalGame: ReturnType<typeof createGame> | undefined;
 
-    for (const entryEdge of edges) {
-      for (const tile of candidateTiles) {
-        const trialGame = {
-          ...game,
-          frontier: {
-            ...game.frontier,
-            col: approachCell!.col,
-            row: approachCell!.row,
-            entryEdge,
-          },
-          offer: [tile],
-        };
+    for (const approachCell of approachCells) {
+      for (const entryEdge of edges) {
+        for (const tile of candidateTiles) {
+          const trialGame = {
+            ...game,
+            frontier: {
+              ...game.frontier,
+              col: approachCell.col,
+              row: approachCell.row,
+              entryEdge,
+            },
+            offer: [tile],
+          };
 
-        if (previewMove(trialGame, tile).outcome === 'win') {
-          winningTile = tile;
-          goalGame = trialGame;
+          if (previewMove(trialGame, tile).outcome === 'win') {
+            winningTile = tile;
+            goalGame = trialGame;
+            break;
+          }
+        }
+
+        if (winningTile && goalGame) {
           break;
         }
       }
