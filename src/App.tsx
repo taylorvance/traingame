@@ -129,8 +129,6 @@ function BagIndicator({
       aria-label={getBagAriaLabel(counts)}
       className="bag-indicator"
     >
-      <span className="bag-indicator-label">Bag</span>
-      <strong className="bag-indicator-total">{counts.total}</strong>
       <div aria-hidden="true" className="bag-indicator-glyphs">
         {BAG_KIND_ORDER.map((kind) => {
           const center = 18;
@@ -427,8 +425,9 @@ function App() {
 
       <header className="hero">
         <div className="hero-copy">
-          <div className="hero-topline">
-            <p className="eyebrow">Rail Puzzle</p>
+          <p className="eyebrow">Rail Puzzle</p>
+          <div className="hero-title-row">
+            <h1>Traingame</h1>
             <button
               aria-label={
                 showPlaytestControls
@@ -457,36 +456,37 @@ function App() {
               </svg>
             </button>
           </div>
-
-          <h1>Traingame</h1>
           <p className="hero-subtitle">
             Lay track from the bottom to any goal at the top.
           </p>
 
           <div className="hero-actions">
-            <button
-              aria-label="Start a new game"
-              className="new-game-button new-game-button-compact"
-              onClick={handleNewGame}
-              type="button"
-            >
-              <svg
-                aria-hidden="true"
-                className="new-game-icon"
-                viewBox="0 0 24 24"
+            <div className="hero-actions-primary">
+              <button
+                aria-label="Start a new game"
+                className="new-game-button new-game-button-compact"
+                onClick={handleNewGame}
+                type="button"
               >
-                <path d="M21 2v6h-6" />
-                <path d="M3 12a9 9 0 0 1 15.6-6.36L21 8" />
-                <path d="M3 22v-6h6" />
-                <path d="M21 12a9 9 0 0 1-15.6 6.36L3 16" />
-              </svg>
-            </button>
-            <SurveyTokenButton
-              compact={isMobileLayout}
-              disabled={game.status !== 'playing' || game.tokens <= 0}
-              onClick={handleSpendToken}
-              tokens={game.tokens}
-            />
+                <svg
+                  aria-hidden="true"
+                  className="new-game-icon"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M21 2v6h-6" />
+                  <path d="M3 12a9 9 0 0 1 15.6-6.36L21 8" />
+                  <path d="M3 22v-6h6" />
+                  <path d="M21 12a9 9 0 0 1-15.6 6.36L3 16" />
+                </svg>
+              </button>
+              <SurveyTokenButton
+                compact={isMobileLayout}
+                disabled={game.status !== 'playing' || game.tokens <= 0}
+                onClick={handleSpendToken}
+                tokens={game.tokens}
+              />
+              <BagIndicator counts={bagCounts} />
+            </div>
             {showPlaytestControls ? (
               <button
                 className="button-secondary"
@@ -499,10 +499,6 @@ function App() {
           </div>
 
           <div className="playbar">
-            <div className="playbar-meta">
-              <BagIndicator counts={bagCounts} />
-            </div>
-
             <div className="playbar-option-grid">
               {renderTileChoices(isMobileLayout)}
             </div>

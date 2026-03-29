@@ -1,5 +1,6 @@
 import { getExitEdge, type Color, type GameState } from '../lib/game';
 import { getEdgeSegment, getHexPoints, getRailPaths } from './railGeometry';
+import SurveyTokenGlyph from './SurveyTokenGlyph';
 
 const HEX_RADIUS = 34;
 const HEX_HEIGHT = Math.sqrt(3) * HEX_RADIUS;
@@ -176,12 +177,12 @@ export default function HexBoard({ game }: { game: GameState }) {
             ) : null}
 
             {hasToken ? (
-              <circle
-                className="token-glyph"
-                cx={center.x}
-                cy={center.y}
-                r={11}
-              />
+              <g
+                className="board-token-glyph"
+                transform={`translate(${center.x} ${center.y}) scale(0.6)`}
+              >
+                <SurveyTokenGlyph />
+              </g>
             ) : null}
 
             {isFrontier ? null : null}

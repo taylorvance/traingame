@@ -6,6 +6,7 @@ import {
   type MovePreview,
 } from '../lib/game';
 import { getEdgeSegment, getHexPoints, getRailPaths } from './railGeometry';
+import SurveyTokenGlyph from './SurveyTokenGlyph';
 
 const GLYPH_RADIUS = 36;
 
@@ -212,34 +213,12 @@ export function SurveyTokenButton({
       <svg
         aria-hidden="true"
         className="survey-token-inline-svg"
-        viewBox="0 0 96 64"
+        viewBox="0 0 64 64"
       >
-        <g transform="translate(13 32)">
-          <polygon
-            className="survey-mini-hex"
-            points="-7,0 -3.5,6.1 3.5,6.1 7,0 3.5,-6.1 -3.5,-6.1"
-          />
-          <line className="survey-mini-rail" x1="-4" x2="4" y1="0" y2="0" />
+        <g transform="translate(32 32)">
+          <SurveyTokenGlyph />
         </g>
-        <g transform="translate(83 32)">
-          <polygon
-            className="survey-mini-hex"
-            points="-7,0 -3.5,6.1 3.5,6.1 7,0 3.5,-6.1 -3.5,-6.1"
-          />
-          <path className="survey-mini-rail" d="M -4 3 Q 0 0 4 -3" />
-        </g>
-        <circle className="survey-token-outer" cx="48" cy="32" r="18" />
-        <circle className="survey-token-inner" cx="48" cy="32" r="11" />
-        <circle className="survey-token-core" cx="48" cy="32" r="5" />
-        <line className="survey-token-cross" x1="48" x2="48" y1="17" y2="23" />
-        <line className="survey-token-cross" x1="48" x2="48" y1="41" y2="47" />
-        <line className="survey-token-cross" x1="33" x2="39" y1="32" y2="32" />
-        <line className="survey-token-cross" x1="57" x2="63" y1="32" y2="32" />
       </svg>
-
-      {!compact ? (
-        <span className="survey-token-inline-text">Survey +2</span>
-      ) : null}
 
       <span className="survey-token-inline-count">{tokens}</span>
     </button>
