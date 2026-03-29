@@ -360,8 +360,9 @@
 .bag-indicator {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.28rem 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.42rem;
+  padding: 0.3rem 0.54rem;
   border-radius: 999px;
   border: 1px solid rgba(41, 35, 24, 0.08);
   background: rgba(255, 252, 244, 0.72);
@@ -381,29 +382,90 @@
   color: var(--ink);
 }
 
-.bag-indicator-bar {
-  display: flex;
-  overflow: hidden;
-  width: 3.5rem;
-  height: 0.45rem;
-  border-radius: 999px;
-  background: rgba(41, 35, 24, 0.08);
+.bag-indicator-glyphs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(1.9rem, 2.1rem));
+  gap: 0.24rem;
 }
 
-.bag-indicator-segment {
-  height: 100%;
+.bag-indicator-chip {
+  display: grid;
+  justify-items: center;
+  gap: 0.04rem;
+  padding: 0.12rem 0.08rem 0.08rem;
+  border-radius: 0.8rem;
+  background: rgba(41, 35, 24, 0.05);
+  color: var(--ink);
 }
 
-.bag-indicator-segment-straight {
-  background: rgba(36, 96, 90, 0.86);
+.bag-indicator-chip-straight {
+  background: rgba(36, 96, 90, 0.11);
 }
 
-.bag-indicator-segment-soft {
-  background: rgba(217, 171, 67, 0.9);
+.bag-indicator-chip-softLeft,
+.bag-indicator-chip-softRight {
+  background: rgba(217, 171, 67, 0.15);
 }
 
-.bag-indicator-segment-hard {
-  background: rgba(180, 86, 62, 0.9);
+.bag-indicator-chip-hardLeft,
+.bag-indicator-chip-hardRight {
+  background: rgba(180, 86, 62, 0.14);
+}
+
+.bag-indicator-svg {
+  display: block;
+  width: 1.52rem;
+  height: 1.52rem;
+}
+
+.bag-indicator-shell {
+  fill: rgba(255, 253, 248, 0.9);
+  stroke: rgba(41, 35, 24, 0.12);
+  stroke-width: 1.1;
+}
+
+.bag-indicator-track {
+  fill: none;
+  stroke: rgba(88, 80, 67, 0.92);
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bag-indicator-edge {
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+
+.bag-indicator-edge-red {
+  stroke: rgba(196, 79, 62, 0.82);
+}
+
+.bag-indicator-edge-blue {
+  stroke: rgba(46, 111, 150, 0.64);
+}
+
+.bag-indicator-chip-empty {
+  background: rgba(41, 35, 24, 0.03);
+  color: rgba(88, 80, 67, 0.55);
+}
+
+.bag-indicator-chip-empty .bag-indicator-shell {
+  fill: rgba(255, 253, 248, 0.48);
+}
+
+.bag-indicator-chip-empty .bag-indicator-track,
+.bag-indicator-chip-empty .bag-indicator-edge {
+  opacity: 0.3;
+}
+
+.bag-indicator-count {
+  min-width: 1.1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .playbar-option-grid {
@@ -916,7 +978,28 @@
   }
 
   .app-shell-mobile .bag-indicator {
+    gap: 0.34rem;
     padding: 0.24rem 0.44rem;
+  }
+
+  .app-shell-mobile .bag-indicator-glyphs {
+    grid-template-columns: repeat(5, minmax(1.62rem, 1.78rem));
+    gap: 0.18rem;
+  }
+
+  .app-shell-mobile .bag-indicator-chip {
+    gap: 0.02rem;
+    padding: 0.08rem 0.04rem 0.06rem;
+  }
+
+  .app-shell-mobile .bag-indicator-svg {
+    width: 1.16rem;
+    height: 1.16rem;
+  }
+
+  .app-shell-mobile .bag-indicator-count {
+    min-width: 0.9rem;
+    font-size: 0.66rem;
   }
 
   .app-shell-mobile .playbar-option-grid {

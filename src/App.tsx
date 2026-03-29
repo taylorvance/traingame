@@ -3,6 +3,11 @@ import { BrandBadge } from '@taylorvance/tv-shared-ui';
 import './App.css';
 import HexBoard from './components/HexBoard';
 import {
+  getEdgeSegment,
+  getHexPoints,
+  getRailPaths,
+} from './components/railGeometry';
+import {
   SurveyTokenButton,
   TileChoiceButton,
 } from './components/TileChoiceButton';
@@ -14,6 +19,7 @@ import {
   estimateFeatureCount,
   estimateObstacleCount,
   estimateTokenCount,
+  getExitEdge,
   getRecommendedTileCounts,
   normalizeRules,
   previewMove,
@@ -21,6 +27,7 @@ import {
   type MovePreview,
   type RulesConfig,
   type Tile,
+  type TileKind,
 } from './lib/game';
 import {
   clearPersistedAppState,
@@ -66,21 +73,112 @@ function createDefaultAppState() {
   };
 }
 
+const BAG_KIND_ORDER: TileKind[] = [
+  'hardLeft',
+  'softLeft',
+  'straight',
+  'softRight',
+  'hardRight',
+];
+
+const BAG_KIND_LABELS: Record<TileKind, string> = {
+  straight: 'Straight',
+  softLeft: 'Soft left',
+  softRight: 'Soft right',
+  hardLeft: 'Hard left',
+  hardRight: 'Hard right',
+};
+
 function getBagCounts(tiles: Tile[]) {
   return tiles.reduce(
     (counts, tile) => {
-      if (tile.kind === 'straight') {
-        counts.straight += 1;
-      } else if (tile.kind === 'softLeft' || tile.kind === 'softRight') {
-        counts.soft += 1;
-      } else {
-        counts.hard += 1;
-      }
-
+      counts[tile.kind] += 1;
       counts.total += 1;
       return counts;
     },
-    { straight: 0, soft: 0, hard: 0, total: 0 },
+    {
+      straight: 0,
+      softLeft: 0,
+      softRight: 0,
+      hardLeft: 0,
+      hardRight: 0,
+      total: 0,
+    },
+  );
+}
+
+function getBagAriaLabel(
+  counts: ReturnType<typeof getBagCounts>,
+): string {
+  const summary = BAG_KIND_ORDER.filter((kind) => counts[kind] > 0)
+    .map((kind) => `${counts[kind]} ${BAG_KIND_LABELS[kind].toLowerCase()}`)
+    .join(', ');
+
+  return summary.length > 0
+    ? `Bag has ${counts.total} future tiles including the current offer. Canonical tile previews show the red endpoint on the bottom edge: ${summary}.`
+    : 'Bag is empty.';
+}
+
+function BagIndicator({
+  counts,
+}: {
+  counts: ReturnType<typeof getBagCounts>;
+}) {
+  return (
+    <div
+      aria-label={getBagAriaLabel(counts)}
+      className="bag-indicator"
+    >
+      <span className="bag-indicator-label">Bag</span>
+      <strong className="bag-indicator-total">{counts.total}</strong>
+      <div aria-hidden="true" className="bag-indicator-glyphs">
+        {BAG_KIND_ORDER.map((kind) => {
+          const center = 18;
+          const radius = 13.5;
+          const exitEdge = getExitEdge(3, kind);
+          const railPaths = getRailPaths(
+            radius,
+            center,
+            center,
+            3,
+            exitEdge,
+            1.6,
+          );
+
+          return (
+            <span
+              className={`bag-indicator-chip bag-indicator-chip-${kind} ${
+                counts[kind] === 0 ? 'bag-indicator-chip-empty' : ''
+              }`}
+              key={kind}
+              title={`${BAG_KIND_LABELS[kind]}: ${counts[kind]}`}
+            >
+              <svg
+                className="bag-indicator-svg"
+                role="img"
+                viewBox="0 0 36 36"
+              >
+                <polygon
+                  className="bag-indicator-shell"
+                  points={getHexPoints(radius, center, center)}
+                />
+                <path className="bag-indicator-track" d={railPaths.left} />
+                <path className="bag-indicator-track" d={railPaths.right} />
+                <line
+                  className="bag-indicator-edge bag-indicator-edge-red"
+                  {...getEdgeSegment(radius, center, center, 3, 0.2)}
+                />
+                <line
+                  className="bag-indicator-edge bag-indicator-edge-blue"
+                  {...getEdgeSegment(radius, center, center, exitEdge, 0.2)}
+                />
+              </svg>
+              <span className="bag-indicator-count">{counts[kind]}</span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -110,7 +208,7 @@ function App() {
   const estimatedFeatures = estimateFeatureCount(draftRules);
   const estimatedTokens = estimateTokenCount(draftRules);
   const estimatedCells = estimateBoardCellCount(draftRules);
-  const bagCounts = getBagCounts(game.deck);
+  const bagCounts = getBagCounts([...game.deck, ...game.offer]);
   const draftChanged =
     JSON.stringify(normalizeRules(draftRules)) !== JSON.stringify(activeRules);
 
@@ -402,35 +500,7 @@ function App() {
 
           <div className="playbar">
             <div className="playbar-meta">
-              <div
-                aria-label={`Bag has ${bagCounts.total} tiles remaining: ${bagCounts.straight} straight, ${bagCounts.soft} soft-turn, ${bagCounts.hard} hard-turn.`}
-                className="bag-indicator"
-              >
-                <span className="bag-indicator-label">Bag</span>
-                <strong className="bag-indicator-total">
-                  {bagCounts.total}
-                </strong>
-                <div aria-hidden="true" className="bag-indicator-bar">
-                  <span
-                    className="bag-indicator-segment bag-indicator-segment-straight"
-                    style={{
-                      width: `${bagCounts.total > 0 ? (bagCounts.straight / bagCounts.total) * 100 : 0}%`,
-                    }}
-                  />
-                  <span
-                    className="bag-indicator-segment bag-indicator-segment-soft"
-                    style={{
-                      width: `${bagCounts.total > 0 ? (bagCounts.soft / bagCounts.total) * 100 : 0}%`,
-                    }}
-                  />
-                  <span
-                    className="bag-indicator-segment bag-indicator-segment-hard"
-                    style={{
-                      width: `${bagCounts.total > 0 ? (bagCounts.hard / bagCounts.total) * 100 : 0}%`,
-                    }}
-                  />
-                </div>
-              </div>
+              <BagIndicator counts={bagCounts} />
             </div>
 
             <div className="playbar-option-grid">

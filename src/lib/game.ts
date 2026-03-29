@@ -194,6 +194,28 @@ function getTileKindLabel(kind: TileKind): string {
   }
 }
 
+export function getContextualTileKind(
+  kind: TileKind,
+  entryColor: Color,
+): TileKind {
+  if (entryColor === 'red') {
+    return kind;
+  }
+
+  switch (kind) {
+    case 'straight':
+      return 'straight';
+    case 'softLeft':
+      return 'softRight';
+    case 'softRight':
+      return 'softLeft';
+    case 'hardLeft':
+      return 'hardRight';
+    case 'hardRight':
+      return 'hardLeft';
+  }
+}
+
 function buildRowSpan(
   width: number,
   row: number,
@@ -936,7 +958,9 @@ export function chooseTile(game: GameState, tileId: string): GameState {
     turnNumber: game.turnNumber,
     tileKind: chosenTile.kind,
     targetKey: preview.targetKey,
-    summary: `${getTileKindLabel(chosenTile.kind)} on ${preview.targetKey}. ${describePreview(preview)}`,
+    summary: `${getTileKindLabel(
+      getContextualTileKind(chosenTile.kind, game.frontier.requiredColor),
+    )} on ${preview.targetKey}. ${describePreview(preview)}`,
   };
 
   if (preview.outcome === 'loss') {
@@ -1054,8 +1078,8 @@ export function estimateBoardCellCount(rules: RulesConfig): number {
   return buildBoard(normalizeRules(rules)).cells.length;
 }
 
-export function getTileKindText(tile: Tile): string {
-  return getTileKindLabel(tile.kind);
+export function getTileKindText(tile: Tile, entryColor: Color = 'red'): string {
+  return getTileKindLabel(getContextualTileKind(tile.kind, entryColor));
 }
 
 export function getBoardCellMap(board: BoardState): Record<string, Cell> {

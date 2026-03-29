@@ -97,7 +97,7 @@ export function TileChoiceButton({
 
   return (
     <button
-      aria-label={`${getTileKindText(preview.tile)}. ${describeChoice(preview)}`}
+      aria-label={`${getTileKindText(preview.tile, requiredColor)}. ${describeChoice(preview)}`}
       className={className}
       disabled={disabled}
       onBlur={onBlur}
@@ -173,7 +173,7 @@ export function TileChoiceButton({
       {!compact ? (
         <div className="tile-choice-meta">
           <span className="tile-choice-name">
-            {getTileKindText(preview.tile)}
+            {getTileKindText(preview.tile, requiredColor)}
           </span>
           <span
             className={`tile-choice-chip tile-choice-chip-${preview.outcome}`}

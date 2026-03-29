@@ -3,6 +3,7 @@ import {
   DEFAULT_RULES,
   chooseTile,
   createGame,
+  getContextualTileKind,
   getRecommendedTileCounts,
   normalizeRules,
   previewMove,
@@ -109,6 +110,16 @@ describe('tile bag composition', () => {
     expect(hardLeftCount + hardRightCount).toBe(5);
     expect(Math.abs(softLeftCount - softRightCount)).toBe(1);
     expect(Math.abs(hardLeftCount - hardRightCount)).toBe(1);
+  });
+});
+
+describe('contextual turn direction', () => {
+  it('flips left and right variants for blue entry', () => {
+    expect(getContextualTileKind('straight', 'blue')).toBe('straight');
+    expect(getContextualTileKind('softLeft', 'blue')).toBe('softRight');
+    expect(getContextualTileKind('softRight', 'blue')).toBe('softLeft');
+    expect(getContextualTileKind('hardLeft', 'blue')).toBe('hardRight');
+    expect(getContextualTileKind('hardRight', 'blue')).toBe('hardLeft');
   });
 });
 
