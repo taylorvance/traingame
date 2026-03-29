@@ -129,6 +129,9 @@ function BagIndicator({
       aria-label={getBagAriaLabel(counts)}
       className="bag-indicator"
     >
+      <span aria-hidden="true" className="bag-indicator-label">
+        Bag
+      </span>
       <div aria-hidden="true" className="bag-indicator-glyphs">
         {BAG_KIND_ORDER.map((kind) => {
           const center = 18;
