@@ -482,13 +482,13 @@ function App() {
                   <path d="M21 12a9 9 0 0 1-15.6 6.36L3 16" />
                 </svg>
               </button>
+              <BagIndicator counts={bagCounts} />
               <SurveyTokenButton
                 compact={isMobileLayout}
                 disabled={game.status !== 'playing' || game.tokens <= 0}
                 onClick={handleSpendToken}
                 tokens={game.tokens}
               />
-              <BagIndicator counts={bagCounts} />
             </div>
             {showPlaytestControls ? (
               <button
