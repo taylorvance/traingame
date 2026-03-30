@@ -1,5 +1,5 @@
 import { getExitEdge, type Color, type GameState } from '../lib/game';
-import { getEdgeSegment, getHexPoints, getRailPaths } from './railGeometry';
+import { getEdgeTieSegment, getHexPoints, getRailPaths } from './railGeometry';
 import SurveyTokenGlyph from './SurveyTokenGlyph';
 
 const HEX_RADIUS = 34;
@@ -26,8 +26,8 @@ function getBoardBounds(game: GameState): { width: number; height: number } {
   };
 }
 
-function edgeBandClass(color: Color): string {
-  return `edge-band edge-band-${color}`;
+function edgeTieClass(color: Color): string {
+  return `edge-tie edge-tie-${color}`;
 }
 
 function rotationForEntryEdge(entryEdge: number): number {
@@ -36,6 +36,8 @@ function rotationForEntryEdge(entryEdge: number): number {
 
 export default function HexBoard({ game }: { game: GameState }) {
   const bounds = getBoardBounds(game);
+  const showStartPrompt =
+    game.status === 'playing' && Object.keys(game.occupiedTracks).length === 0;
 
   return (
     <svg
@@ -57,13 +59,15 @@ export default function HexBoard({ game }: { game: GameState }) {
 
       {game.board.cells.map((cell) => {
         const center = getHexCenter(cell.col, cell.row);
+        const cellClipId = `board-cell-${cell.key.replace(',', '-')}`;
+        const hexPoints = getHexPoints(HEX_RADIUS, center.x, center.y);
         const occupiedTrack = game.occupiedTracks[cell.key];
         const baseExitEdge = occupiedTrack
           ? getExitEdge(3, occupiedTrack.tile.kind)
           : null;
         const railPaths =
           occupiedTrack && baseExitEdge !== null
-            ? getRailPaths(HEX_RADIUS, center.x, center.y, 3, baseExitEdge, 4.4)
+            ? getRailPaths(HEX_RADIUS, center.x, center.y, 3, baseExitEdge, 5.2)
             : null;
         const isFrontier =
           game.frontier.col === cell.col &&
@@ -75,9 +79,27 @@ export default function HexBoard({ game }: { game: GameState }) {
 
         return (
           <g className="board-cell" key={cell.key}>
+            <defs>
+              <clipPath id={cellClipId}>
+                <polygon points={hexPoints} />
+              </clipPath>
+            </defs>
+
+            {!occupiedTrack && isFrontier && showStartPrompt ? (
+              <line
+                className={edgeTieClass('red')}
+                {...getEdgeTieSegment(
+                  HEX_RADIUS,
+                  center.x,
+                  center.y,
+                  game.frontier.entryEdge,
+                )}
+              />
+            ) : null}
+
             <polygon
               className={`hex-tile ${isGoal ? 'goal-cell' : ''} ${isObstacle ? 'obstacle-cell' : ''} ${isFrontier ? 'frontier-cell' : ''}`}
-              points={getHexPoints(HEX_RADIUS, center.x, center.y)}
+              points={hexPoints}
             />
 
             {isObstacle ? (
@@ -145,19 +167,10 @@ export default function HexBoard({ game }: { game: GameState }) {
             ) : null}
 
             {occupiedTrack ? (
-              <g
-                transform={`rotate(${rotationForEntryEdge(occupiedTrack.entryEdge)} ${center.x} ${center.y})`}
-              >
-                <path className="track-rail" d={railPaths?.left} />
-                <path className="track-rail" d={railPaths?.right} />
-              </g>
-            ) : null}
-
-            {occupiedTrack ? (
-              <>
+              <g clipPath={`url(#${cellClipId})`}>
                 <line
-                  className={edgeBandClass(occupiedTrack.entryColor)}
-                  {...getEdgeSegment(
+                  className={edgeTieClass(occupiedTrack.entryColor)}
+                  {...getEdgeTieSegment(
                     HEX_RADIUS,
                     center.x,
                     center.y,
@@ -165,15 +178,24 @@ export default function HexBoard({ game }: { game: GameState }) {
                   )}
                 />
                 <line
-                  className={edgeBandClass(occupiedTrack.exitColor)}
-                  {...getEdgeSegment(
+                  className={edgeTieClass(occupiedTrack.exitColor)}
+                  {...getEdgeTieSegment(
                     HEX_RADIUS,
                     center.x,
                     center.y,
                     occupiedTrack.exitEdge,
                   )}
                 />
-              </>
+              </g>
+            ) : null}
+
+            {occupiedTrack ? (
+              <g
+                transform={`rotate(${rotationForEntryEdge(occupiedTrack.entryEdge)} ${center.x} ${center.y})`}
+              >
+                <path className="track-rail" d={railPaths?.left} />
+                <path className="track-rail" d={railPaths?.right} />
+              </g>
             ) : null}
 
             {hasToken ? (

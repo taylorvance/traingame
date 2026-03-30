@@ -5,13 +5,13 @@ import {
   type Edge,
   type MovePreview,
 } from '../lib/game';
-import { getEdgeSegment, getHexPoints, getRailPaths } from './railGeometry';
+import { getEdgeTieSegment, getHexPoints, getRailPaths } from './railGeometry';
 import SurveyTokenGlyph from './SurveyTokenGlyph';
 
 const GLYPH_RADIUS = 36;
 
-function edgeBandClass(color: Color): string {
-  return `tile-choice-edge tile-choice-edge-${color}`;
+function edgeTieClass(color: Color): string {
+  return `tile-choice-edge-tie tile-choice-edge-tie-${color}`;
 }
 
 function rotationForEntryEdge(entryEdge: number): number {
@@ -78,6 +78,8 @@ export function TileChoiceButton({
   requiredColor: Color;
 }) {
   const center = 48;
+  const clipId = `tile-choice-${preview.tile.id}-clip`;
+  const hexPoints = getHexPoints(GLYPH_RADIUS, center, center);
   const baseExitEdge = getExitEdge(3, preview.tile.kind);
   const railPaths = getRailPaths(
     GLYPH_RADIUS,
@@ -85,7 +87,7 @@ export function TileChoiceButton({
     center,
     3,
     baseExitEdge,
-    4.2,
+    5.2,
   );
   const className = [
     'tile-choice',
@@ -114,24 +116,28 @@ export function TileChoiceButton({
         role="img"
         viewBox="0 0 96 96"
       >
-        <polygon
-          className="tile-choice-shell"
-          points={getHexPoints(GLYPH_RADIUS, center, center)}
-        />
+        <defs>
+          <clipPath id={clipId}>
+            <polygon points={hexPoints} />
+          </clipPath>
+        </defs>
+        <polygon className="tile-choice-shell" points={hexPoints} />
+        <g clipPath={`url(#${clipId})`}>
+          <line
+            className={edgeTieClass(requiredColor)}
+            {...getEdgeTieSegment(GLYPH_RADIUS, center, center, entryEdge)}
+          />
+          <line
+            className={edgeTieClass(preview.nextRequiredColor)}
+            {...getEdgeTieSegment(GLYPH_RADIUS, center, center, preview.exitEdge)}
+          />
+        </g>
         <g
           transform={`rotate(${rotationForEntryEdge(entryEdge)} ${center} ${center})`}
         >
           <path className="tile-choice-track-rail" d={railPaths.left} />
           <path className="tile-choice-track-rail" d={railPaths.right} />
         </g>
-        <line
-          className={edgeBandClass(requiredColor)}
-          {...getEdgeSegment(GLYPH_RADIUS, center, center, entryEdge)}
-        />
-        <line
-          className={edgeBandClass(preview.nextRequiredColor)}
-          {...getEdgeSegment(GLYPH_RADIUS, center, center, preview.exitEdge)}
-        />
 
         {preview.outcome === 'win' ? (
           <circle

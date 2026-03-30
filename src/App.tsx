@@ -3,7 +3,7 @@ import { BrandBadge } from '@taylorvance/tv-shared-ui';
 import './App.css';
 import HexBoard from './components/HexBoard';
 import {
-  getEdgeSegment,
+  getEdgeTieSegment,
   getHexPoints,
   getRailPaths,
 } from './components/railGeometry';
@@ -250,6 +250,8 @@ function BagIndicator({
         {BAG_KIND_ORDER.map((kind) => {
           const center = 18;
           const radius = 13.5;
+          const clipId = `bag-indicator-${kind}-clip`;
+          const hexPoints = getHexPoints(radius, center, center);
           const exitEdge = getExitEdge(3, kind);
           const railPaths = getRailPaths(
             radius,
@@ -257,7 +259,7 @@ function BagIndicator({
             center,
             3,
             exitEdge,
-            1.6,
+            1.9,
           );
 
           return (
@@ -273,20 +275,24 @@ function BagIndicator({
                 role="img"
                 viewBox="0 0 36 36"
               >
-                <polygon
-                  className="bag-indicator-shell"
-                  points={getHexPoints(radius, center, center)}
-                />
+                <defs>
+                  <clipPath id={clipId}>
+                    <polygon points={hexPoints} />
+                  </clipPath>
+                </defs>
+                <polygon className="bag-indicator-shell" points={hexPoints} />
+                <g clipPath={`url(#${clipId})`}>
+                  <line
+                    className="bag-indicator-half-tie bag-indicator-half-tie-red"
+                    {...getEdgeTieSegment(radius, center, center, 3)}
+                  />
+                  <line
+                    className="bag-indicator-half-tie bag-indicator-half-tie-blue"
+                    {...getEdgeTieSegment(radius, center, center, exitEdge)}
+                  />
+                </g>
                 <path className="bag-indicator-track" d={railPaths.left} />
                 <path className="bag-indicator-track" d={railPaths.right} />
-                <line
-                  className="bag-indicator-edge bag-indicator-edge-red"
-                  {...getEdgeSegment(radius, center, center, 3, 0.2)}
-                />
-                <line
-                  className="bag-indicator-edge bag-indicator-edge-blue"
-                  {...getEdgeSegment(radius, center, center, exitEdge, 0.2)}
-                />
               </svg>
               <span className="bag-indicator-count">{counts[kind]}</span>
             </span>

@@ -108,6 +108,40 @@ export function getEdgeSegment(
   };
 }
 
+export function getEdgeTieSegment(
+  radius: number,
+  centerX: number,
+  centerY: number,
+  edge: Edge,
+  lengthScale = 0.68,
+): { x1: number; y1: number; x2: number; y2: number } {
+  const vertices = getHexVertices(radius, centerX, centerY);
+  const edgeVertices: Record<Edge, [number, number]> = {
+    0: [4, 5],
+    1: [5, 0],
+    2: [0, 1],
+    3: [1, 2],
+    4: [2, 3],
+    5: [3, 4],
+  };
+  const [startIndex, endIndex] = edgeVertices[edge];
+  const start = vertices[startIndex];
+  const end = vertices[endIndex];
+  const midpoint = {
+    x: (start.x + end.x) / 2,
+    y: (start.y + end.y) / 2,
+  };
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+
+  return {
+    x1: midpoint.x - dx * lengthScale * 0.5,
+    y1: midpoint.y - dy * lengthScale * 0.5,
+    x2: midpoint.x + dx * lengthScale * 0.5,
+    y2: midpoint.y + dy * lengthScale * 0.5,
+  };
+}
+
 function getQuadraticPoint(
   start: Point,
   control: Point,

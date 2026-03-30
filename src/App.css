@@ -332,26 +332,27 @@
 
 .track-rail {
   fill: none;
-  stroke-linecap: round;
+  stroke-linecap: square;
   stroke-linejoin: round;
 }
 
 .track-rail {
-  stroke: rgba(88, 80, 67, 0.96);
-  stroke-width: 3.6;
+  stroke: rgba(33, 30, 25, 0.98);
+  stroke-width: 3.2;
 }
 
-.edge-band {
-  stroke-width: 3.6;
-  stroke-linecap: round;
+.edge-tie {
+  stroke-width: 4.8;
+  stroke-linecap: square;
+  opacity: 0.96;
 }
 
-.edge-band-red {
-  stroke: rgba(196, 79, 62, 0.36);
+.edge-tie-red {
+  stroke: rgba(214, 78, 58, 0.94);
 }
 
-.edge-band-blue {
-  stroke: rgba(46, 111, 150, 0.36);
+.edge-tie-blue {
+  stroke: rgba(36, 122, 176, 0.94);
 }
 
 .playbar {
@@ -429,23 +430,24 @@
 
 .bag-indicator-track {
   fill: none;
-  stroke: rgba(88, 80, 67, 0.92);
-  stroke-width: 2.1;
-  stroke-linecap: round;
+  stroke: rgba(33, 30, 25, 0.96);
+  stroke-width: 1.95;
+  stroke-linecap: square;
   stroke-linejoin: round;
 }
 
-.bag-indicator-edge {
-  stroke-width: 2.4;
-  stroke-linecap: round;
+.bag-indicator-half-tie {
+  stroke-width: 3.2;
+  stroke-linecap: square;
+  opacity: 0.96;
 }
 
-.bag-indicator-edge-red {
-  stroke: rgba(196, 79, 62, 0.82);
+.bag-indicator-half-tie-red {
+  stroke: rgba(214, 78, 58, 0.94);
 }
 
-.bag-indicator-edge-blue {
-  stroke: rgba(46, 111, 150, 0.64);
+.bag-indicator-half-tie-blue {
+  stroke: rgba(36, 122, 176, 0.94);
 }
 
 .bag-indicator-chip-empty {
@@ -458,7 +460,7 @@
 }
 
 .bag-indicator-chip-empty .bag-indicator-track,
-.bag-indicator-chip-empty .bag-indicator-edge {
+.bag-indicator-chip-empty .bag-indicator-half-tie {
   opacity: 0.3;
 }
 
@@ -556,26 +558,27 @@
 
 .tile-choice-track-rail {
   fill: none;
-  stroke-linecap: round;
+  stroke-linecap: square;
   stroke-linejoin: round;
 }
 
 .tile-choice-track-rail {
-  stroke: rgba(88, 80, 67, 0.96);
-  stroke-width: 3.3;
+  stroke: rgba(33, 30, 25, 0.98);
+  stroke-width: 3;
 }
 
-.tile-choice-edge {
-  stroke-width: 3.2;
-  stroke-linecap: round;
+.tile-choice-edge-tie {
+  stroke-width: 5.2;
+  stroke-linecap: square;
+  opacity: 0.96;
 }
 
-.tile-choice-edge-red {
-  stroke: rgba(196, 79, 62, 0.34);
+.tile-choice-edge-tie-red {
+  stroke: rgba(214, 78, 58, 0.94);
 }
 
-.tile-choice-edge-blue {
-  stroke: rgba(46, 111, 150, 0.34);
+.tile-choice-edge-tie-blue {
+  stroke: rgba(36, 122, 176, 0.94);
 }
 
 .tile-choice-goal-ring {
