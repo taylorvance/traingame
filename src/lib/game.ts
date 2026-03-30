@@ -240,6 +240,29 @@ function buildRowSpan(
   return [0, width - 1];
 }
 
+function getOpeningBufferPositions(start: Cell): Cell[] {
+  const hardTurnKinds: TileKind[] = ['hardLeft', 'hardRight'];
+
+  return hardTurnKinds.map((tileKind) => {
+    const exitEdge = getExitEdge(START_ENTRY_EDGE, tileKind);
+    const [col, row] = getNeighbor(start.col, start.row, exitEdge);
+
+    return {
+      col,
+      row,
+      key: cellKey(col, row),
+    };
+  });
+}
+
+function getOpeningBufferKeys(board: BoardState): Set<string> {
+  return new Set(
+    getOpeningBufferPositions(board.start)
+      .filter((cell) => board.cells.some((candidate) => candidate.key === cell.key))
+      .map((cell) => cell.key),
+  );
+}
+
 function buildBoard(rules: RulesConfig): BoardState {
   const cells: Cell[] = [];
 
@@ -264,6 +287,16 @@ function buildBoard(rules: RulesConfig): BoardState {
   const start =
     cells.find((cell) => cell.col === startCol && cell.row === startRow) ??
     cells[cells.length - 1];
+  const openingBufferCells = getOpeningBufferPositions(start).filter(
+    (cell) =>
+      cell.col >= 0 &&
+      cell.col < rules.boardWidth &&
+      cell.row >= 0 &&
+      cell.row <= rules.boardHeight &&
+      !cells.some((candidate) => candidate.key === cell.key),
+  );
+
+  cells.push(...openingBufferCells);
 
   return {
     cells,
@@ -318,8 +351,13 @@ export function getRecommendedTileCounts(
 }
 
 function getFeatureCells(board: BoardState): Cell[] {
+  const openingBufferKeys = getOpeningBufferKeys(board);
+
   return board.cells.filter(
-    (cell) => cell.key !== board.start.key && cell.row !== 0,
+    (cell) =>
+      cell.key !== board.start.key &&
+      cell.row !== 0 &&
+      !openingBufferKeys.has(cell.key),
   );
 }
 

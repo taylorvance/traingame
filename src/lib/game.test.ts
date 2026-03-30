@@ -264,6 +264,49 @@ describe('move resolution', () => {
     expect(placedTrack?.exitColor).toBe('blue');
   });
 
+  it('keeps first-turn hard turns alive on the default board', () => {
+    const game = createGame({
+      ...DEFAULT_RULES,
+      featureDensityPercent: 0,
+      seed: 11,
+    });
+    const hardLeftPreview = previewMove(game, {
+      id: 'hard-left',
+      kind: 'hardLeft',
+    });
+    const hardRightPreview = previewMove(game, {
+      id: 'hard-right',
+      kind: 'hardRight',
+    });
+
+    expect(hardLeftPreview.outcome).toBe('continue');
+    expect(hardLeftPreview.reason).toContain('toward');
+    expect(hardRightPreview.outcome).toBe('continue');
+    expect(hardRightPreview.reason).toContain('toward');
+  });
+
+  it('keeps opening hard-turn buffer cells free of features', () => {
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const game = createGame({
+        ...DEFAULT_RULES,
+        featureDensityPercent: 40,
+        hazardBalancePercent: 100,
+        seed,
+      });
+      const hardLeftPreview = previewMove(game, {
+        id: 'hard-left',
+        kind: 'hardLeft',
+      });
+      const hardRightPreview = previewMove(game, {
+        id: 'hard-right',
+        kind: 'hardRight',
+      });
+
+      expect(hardLeftPreview.outcome).not.toBe('loss');
+      expect(hardRightPreview.outcome).not.toBe('loss');
+    }
+  });
+
   it('loses when the bag runs out before the next turn offer can be dealt', () => {
     const game = createGame({
       ...DEFAULT_RULES,
