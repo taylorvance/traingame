@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "playtest:report": "node --experimental-transform-types scripts/playtest-report.ts",
     "test": "vitest --run",
     "verify": "npm run lint && npm run test && npm run build"
   },

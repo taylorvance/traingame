@@ -807,6 +807,54 @@
   gap: 0.7rem;
 }
 
+.preset-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.preset-card {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.78rem 0.84rem;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid rgba(41, 35, 24, 0.08);
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.preset-card:hover,
+.preset-card:focus-visible {
+  transform: translateY(-1px);
+  border-color: rgba(36, 96, 90, 0.22);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(38, 31, 22, 0.08);
+}
+
+.preset-card-active {
+  border-color: rgba(36, 96, 90, 0.28);
+  background:
+    linear-gradient(180deg, rgba(40, 122, 111, 0.08), transparent 100%),
+    rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(40, 122, 111, 0.08);
+}
+
+.preset-card-label {
+  font-size: 0.96rem;
+  font-weight: 800;
+}
+
+.preset-card-copy {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
 .control-row,
 .select-row,
 .number-row {

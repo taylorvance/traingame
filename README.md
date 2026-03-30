@@ -19,6 +19,7 @@ Useful scripts:
 - `npm run lint`
 - `npm run test`
 - `npm run build`
+- `npm run playtest:report`
 - `npm run verify`
 
 ## Deploy
@@ -39,7 +40,9 @@ the current run and playtest settings can survive refreshes without colliding wi
 
 - [Design Doc](docs/design.md)
 - [Theme Notes](docs/theme.md)
+- [Automated Playtesting](docs/automated-playtesting.md)
 - [Web Prototype Plan](docs/prototype-plan.md)
+- [Playtest Report](docs/playtest-report.md)
 
 ## Next Step
 

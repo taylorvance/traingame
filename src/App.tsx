@@ -89,6 +89,120 @@ const BAG_KIND_LABELS: Record<TileKind, string> = {
   hardRight: 'Hard right',
 };
 
+interface RulesPreset {
+  id: string;
+  label: string;
+  description: string;
+  rules: RulesConfig;
+}
+
+const RULES_PRESETS: RulesPreset[] = [
+  {
+    id: 'default',
+    label: 'Default',
+    description:
+      'Current baseline with a 4/10/8 bag and a 50/50 reward-hazard split.',
+    rules: DEFAULT_RULES,
+  },
+  {
+    id: 'fairer',
+    label: 'Fairer',
+    description: 'Recommended next test with lighter hazards and a slightly straighter bag.',
+    rules: {
+      ...DEFAULT_RULES,
+      startingTokens: 1,
+      featureDensityPercent: 18,
+      hazardBalancePercent: 40,
+      straightWeight: 6,
+      softWeight: 8,
+      hardWeight: 6,
+    },
+  },
+  {
+    id: 'easy',
+    label: 'Easy Cruise',
+    description: 'Friendly mode with 2 starting tokens plus lighter hazards and straighter rails.',
+    rules: {
+      ...DEFAULT_RULES,
+      startingTokens: 2,
+      featureDensityPercent: 18,
+      hazardBalancePercent: 25,
+      straightWeight: 6,
+      softWeight: 8,
+      hardWeight: 6,
+    },
+  },
+  {
+    id: 'token-rush',
+    label: 'Token Rush',
+    description:
+      'High-feature board with lots of rewards and relatively few hazards.',
+    rules: {
+      ...DEFAULT_RULES,
+      featureDensityPercent: 30,
+      hazardBalancePercent: 20,
+    },
+  },
+  {
+    id: 'turn-maze',
+    label: 'Turn Maze',
+    description:
+      'Sharper navigation pressure with a turn-heavy bag and mid-high hazards.',
+    rules: {
+      ...DEFAULT_RULES,
+      featureDensityPercent: 22,
+      hazardBalancePercent: 45,
+      straightWeight: 2,
+      softWeight: 12,
+      hardWeight: 10,
+    },
+  },
+  {
+    id: 'short-sprint',
+    label: 'Short Sprint',
+    description:
+      'Smaller board with lighter feature pressure and quicker, punchier runs.',
+    rules: {
+      ...DEFAULT_RULES,
+      boardWidth: 5,
+      boardHeight: 6,
+      featureDensityPercent: 14,
+      hazardBalancePercent: 35,
+      straightWeight: 3,
+      softWeight: 8,
+      hardWeight: 6,
+    },
+  },
+  {
+    id: 'long-haul',
+    label: 'Long Haul',
+    description:
+      'Larger board with more tiles, more features, and a longer planning horizon.',
+    rules: {
+      ...DEFAULT_RULES,
+      boardWidth: 9,
+      boardHeight: 11,
+      featureDensityPercent: 22,
+      hazardBalancePercent: 40,
+      straightWeight: 5,
+      softWeight: 14,
+      hardWeight: 10,
+    },
+  },
+  {
+    id: 'stingy',
+    label: 'Stingy Gauntlet',
+    description:
+      'Hard mode: no starting token, denser hazards, and fewer bailouts.',
+    rules: {
+      ...DEFAULT_RULES,
+      startingTokens: 0,
+      featureDensityPercent: 24,
+      hazardBalancePercent: 65,
+    },
+  },
+];
+
 function getBagCounts(tiles: Tile[]) {
   return tiles.reduce(
     (counts, tile) => {
@@ -210,8 +324,20 @@ function App() {
   const estimatedTokens = estimateTokenCount(draftRules);
   const estimatedCells = estimateBoardCellCount(draftRules);
   const bagCounts = getBagCounts([...game.deck, ...game.offer]);
+  const normalizedDraftRules = normalizeRules(draftRules);
   const draftChanged =
-    JSON.stringify(normalizeRules(draftRules)) !== JSON.stringify(activeRules);
+    JSON.stringify(normalizedDraftRules) !== JSON.stringify(activeRules);
+  const activePresetId =
+    RULES_PRESETS.find(
+      (preset) =>
+        JSON.stringify(normalizedDraftRules) ===
+        JSON.stringify(
+          normalizeRules({
+            ...preset.rules,
+            seed: draftRules.seed,
+          }),
+        ),
+    )?.id ?? null;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(max-width: 720px)');
@@ -337,6 +463,15 @@ function App() {
       setGame(createGame(normalizedRules));
       setHoveredTileId(null);
     });
+  }
+
+  function applyRulesPreset(preset: RulesPreset) {
+    setDraftRules((currentRules) =>
+      normalizeRules({
+        ...preset.rules,
+        seed: currentRules.seed,
+      }),
+    );
   }
 
   function handleNewGame() {
@@ -607,6 +742,29 @@ function App() {
                 >
                   Reset to defaults
                 </button>
+              </div>
+
+              <div className="control-group">
+                <p className="group-label">Presets</p>
+                <div className="preset-grid">
+                  {RULES_PRESETS.map((preset) => (
+                    <button
+                      className={
+                        activePresetId === preset.id
+                          ? 'preset-card preset-card-active'
+                          : 'preset-card'
+                      }
+                      key={preset.id}
+                      onClick={() => applyRulesPreset(preset)}
+                      type="button"
+                    >
+                      <span className="preset-card-label">{preset.label}</span>
+                      <span className="preset-card-copy">
+                        {preset.description}
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="control-group">
