@@ -18,22 +18,6 @@ function rotationForEntryEdge(entryEdge: number): number {
   return (entryEdge - 3) * 60;
 }
 
-function getPreviewChip(preview: MovePreview): string {
-  if (preview.outcome === 'win') {
-    return 'Goal';
-  }
-
-  if (preview.outcome === 'loss') {
-    return 'Blocked';
-  }
-
-  if (preview.tokenGain > 0) {
-    return '+1 token';
-  }
-
-  return 'Safe';
-}
-
 function describeChoice(preview: MovePreview): string {
   if (preview.outcome === 'win') {
     return preview.tokenGain > 0
@@ -92,7 +76,6 @@ export function TileChoiceButton({
   const className = [
     'tile-choice',
     compact ? 'tile-choice-compact' : '',
-    `tile-choice-${preview.outcome}`,
     hovered ? 'tile-choice-active' : '',
   ]
     .filter(Boolean)
@@ -138,54 +121,12 @@ export function TileChoiceButton({
           <path className="tile-choice-track-rail" d={railPaths.left} />
           <path className="tile-choice-track-rail" d={railPaths.right} />
         </g>
-
-        {preview.outcome === 'win' ? (
-          <circle
-            className="tile-choice-goal-ring"
-            cx={center}
-            cy={center}
-            r={10}
-          />
-        ) : null}
-
-        {preview.outcome === 'loss' ? (
-          <>
-            <line
-              className="tile-choice-block"
-              x1={center - 8}
-              x2={center + 8}
-              y1={center - 8}
-              y2={center + 8}
-            />
-            <line
-              className="tile-choice-block"
-              x1={center + 8}
-              x2={center - 8}
-              y1={center - 8}
-              y2={center + 8}
-            />
-          </>
-        ) : null}
-
-        {preview.tokenGain > 0 ? (
-          <g transform="translate(71 23)">
-            <circle className="tile-choice-token-badge" cx="0" cy="0" r="11" />
-            <text className="tile-choice-token-text" x="0" y="4">
-              +1
-            </text>
-          </g>
-        ) : null}
       </svg>
 
       {!compact ? (
         <div className="tile-choice-meta">
           <span className="tile-choice-name">
             {getTileKindText(preview.tile, requiredColor)}
-          </span>
-          <span
-            className={`tile-choice-chip tile-choice-chip-${preview.outcome}`}
-          >
-            {getPreviewChip(preview)}
           </span>
         </div>
       ) : null}

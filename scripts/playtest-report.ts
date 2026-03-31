@@ -1,8 +1,8 @@
 import {
   DEFAULT_RULES,
-  getRecommendedTileCounts,
   type RulesConfig,
 } from '../src/lib/game.ts';
+import { RULES_PRESETS } from '../src/lib/presets.ts';
 import {
   type ExperimentConfig,
   type PlaytestAggregate,
@@ -179,105 +179,12 @@ function buildNamedPresetExperiments(
   options: CliOptions,
   policy: ExperimentConfig['policy'],
 ): ExperimentConfig[] {
-  const shortSprintTiles = getRecommendedTileCounts(5, 6, 'symmetric');
-  const longHaulTiles = getRecommendedTileCounts(9, 11, 'symmetric');
-
-  const variants: Array<{
-    label: string;
-    rules: RulesConfig;
-  }> = [
-    {
-      label: 'default',
-      rules: DEFAULT_RULES,
-    },
-    {
-      label: 'fairer-default',
-      rules: {
-        ...DEFAULT_RULES,
-        hazardBalancePercent: 40,
-        straightWeight: 6,
-        softWeight: 8,
-        hardWeight: 6,
-      },
-    },
-    {
-      label: 'easy-cruise',
-      rules: {
-        ...DEFAULT_RULES,
-        startingTokens: 2,
-        hazardBalancePercent: 25,
-        straightWeight: 6,
-        softWeight: 8,
-        hardWeight: 6,
-      },
-    },
-    {
-      label: 'stingy-gauntlet',
-      rules: {
-        ...DEFAULT_RULES,
-        startingTokens: 0,
-        featureDensityPercent: 24,
-        hazardBalancePercent: 65,
-        straightWeight: 4,
-        softWeight: 10,
-        hardWeight: 8,
-      },
-    },
-    {
-      label: 'token-rush',
-      rules: {
-        ...DEFAULT_RULES,
-        startingTokens: 1,
-        featureDensityPercent: 30,
-        hazardBalancePercent: 20,
-        straightWeight: 4,
-        softWeight: 10,
-        hardWeight: 8,
-      },
-    },
-    {
-      label: 'turn-maze',
-      rules: {
-        ...DEFAULT_RULES,
-        startingTokens: 1,
-        featureDensityPercent: 22,
-        hazardBalancePercent: 45,
-        straightWeight: 2,
-        softWeight: 12,
-        hardWeight: 10,
-      },
-    },
-    {
-      label: 'short-sprint',
-      rules: {
-        ...DEFAULT_RULES,
-        boardWidth: 5,
-        boardHeight: 6,
-        featureDensityPercent: 14,
-        hazardBalancePercent: 35,
-        ...shortSprintTiles,
-      },
-    },
-    {
-      label: 'long-haul',
-      rules: {
-        ...DEFAULT_RULES,
-        boardWidth: 9,
-        boardHeight: 11,
-        startingTokens: 1,
-        featureDensityPercent: 22,
-        hazardBalancePercent: 40,
-        ...longHaulTiles,
-      },
-    },
-  ];
-
-  return variants.map((variant) => ({
-    label: variant.label,
+  return RULES_PRESETS.map((preset) => ({
+    label: preset.id,
     games: options.sweepGames,
     seedStart: options.seedStart,
     policy,
-    rules: variant.rules,
+    rules: preset.rules,
   }));
 }
 

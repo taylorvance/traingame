@@ -1,4 +1,10 @@
-import { startTransition, useEffect, useMemo, useState } from 'react';
+import {
+  startTransition,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from 'react';
 import { BrandBadge } from '@taylorvance/tv-shared-ui';
 import './App.css';
 import HexBoard from './components/HexBoard';
@@ -12,13 +18,14 @@ import {
   TileChoiceButton,
 } from './components/TileChoiceButton';
 import {
-  DEFAULT_RULES,
   chooseTile,
   createGame,
+  createGameFromSetupDeck,
   estimateBoardCellCount,
   estimateFeatureCount,
   estimateObstacleCount,
   estimateTokenCount,
+  getBoardCoordinateLabelFromKey,
   getExitEdge,
   getRecommendedTileCounts,
   normalizeRules,
@@ -29,6 +36,12 @@ import {
   type Tile,
   type TileKind,
 } from './lib/game';
+import {
+  DEFAULT_PRESET_RULES,
+  RULES_PRESETS,
+  findMatchingRulesPreset,
+  type RulesPreset,
+} from './lib/presets';
 import {
   clearPersistedAppState,
   loadPersistedAppState,
@@ -46,7 +59,13 @@ function withFreshSeed(rules: RulesConfig): RulesConfig {
   };
 }
 
-const INITIAL_RULES = withFreshSeed(DEFAULT_RULES);
+function createGameForRules(rules: RulesConfig): ReturnType<typeof createGame> {
+  return findMatchingRulesPreset(rules)
+    ? createGameFromSetupDeck(rules)
+    : createGame(rules);
+}
+
+const INITIAL_RULES = withFreshSeed(DEFAULT_PRESET_RULES);
 
 function createInitialAppState() {
   const persistedState = loadPersistedAppState();
@@ -57,18 +76,18 @@ function createInitialAppState() {
   return {
     draftRules: INITIAL_RULES,
     activeRules: INITIAL_RULES,
-    game: createGame(INITIAL_RULES),
+    game: createGameForRules(INITIAL_RULES),
     showPlaytestControls: false,
   };
 }
 
 function createDefaultAppState() {
-  const defaultRules = withFreshSeed(DEFAULT_RULES);
+  const defaultRules = withFreshSeed(DEFAULT_PRESET_RULES);
 
   return {
     draftRules: defaultRules,
     activeRules: defaultRules,
-    game: createGame(defaultRules),
+    game: createGameForRules(defaultRules),
     showPlaytestControls: false,
   };
 }
@@ -88,120 +107,6 @@ const BAG_KIND_LABELS: Record<TileKind, string> = {
   hardLeft: 'Hard left',
   hardRight: 'Hard right',
 };
-
-interface RulesPreset {
-  id: string;
-  label: string;
-  description: string;
-  rules: RulesConfig;
-}
-
-const RULES_PRESETS: RulesPreset[] = [
-  {
-    id: 'default',
-    label: 'Default',
-    description:
-      'Current baseline with a 4/10/8 bag and a 50/50 reward-hazard split.',
-    rules: DEFAULT_RULES,
-  },
-  {
-    id: 'fairer',
-    label: 'Fairer',
-    description: 'Recommended next test with lighter hazards and a slightly straighter bag.',
-    rules: {
-      ...DEFAULT_RULES,
-      startingTokens: 1,
-      featureDensityPercent: 18,
-      hazardBalancePercent: 40,
-      straightWeight: 6,
-      softWeight: 8,
-      hardWeight: 6,
-    },
-  },
-  {
-    id: 'easy',
-    label: 'Easy Cruise',
-    description: 'Friendly mode with 2 starting tokens plus lighter hazards and straighter rails.',
-    rules: {
-      ...DEFAULT_RULES,
-      startingTokens: 2,
-      featureDensityPercent: 18,
-      hazardBalancePercent: 25,
-      straightWeight: 6,
-      softWeight: 8,
-      hardWeight: 6,
-    },
-  },
-  {
-    id: 'token-rush',
-    label: 'Token Rush',
-    description:
-      'High-feature board with lots of rewards and relatively few hazards.',
-    rules: {
-      ...DEFAULT_RULES,
-      featureDensityPercent: 30,
-      hazardBalancePercent: 20,
-    },
-  },
-  {
-    id: 'turn-maze',
-    label: 'Turn Maze',
-    description:
-      'Sharper navigation pressure with a turn-heavy bag and mid-high hazards.',
-    rules: {
-      ...DEFAULT_RULES,
-      featureDensityPercent: 22,
-      hazardBalancePercent: 45,
-      straightWeight: 2,
-      softWeight: 12,
-      hardWeight: 10,
-    },
-  },
-  {
-    id: 'short-sprint',
-    label: 'Short Sprint',
-    description:
-      'Smaller board with lighter feature pressure and quicker, punchier runs.',
-    rules: {
-      ...DEFAULT_RULES,
-      boardWidth: 5,
-      boardHeight: 6,
-      featureDensityPercent: 14,
-      hazardBalancePercent: 35,
-      straightWeight: 3,
-      softWeight: 8,
-      hardWeight: 6,
-    },
-  },
-  {
-    id: 'long-haul',
-    label: 'Long Haul',
-    description:
-      'Larger board with more tiles, more features, and a longer planning horizon.',
-    rules: {
-      ...DEFAULT_RULES,
-      boardWidth: 9,
-      boardHeight: 11,
-      featureDensityPercent: 22,
-      hazardBalancePercent: 40,
-      straightWeight: 5,
-      softWeight: 14,
-      hardWeight: 10,
-    },
-  },
-  {
-    id: 'stingy',
-    label: 'Stingy Gauntlet',
-    description:
-      'Hard mode: no starting token, denser hazards, and fewer bailouts.',
-    rules: {
-      ...DEFAULT_RULES,
-      startingTokens: 0,
-      featureDensityPercent: 24,
-      hazardBalancePercent: 65,
-    },
-  },
-];
 
 function getBagCounts(tiles: Tile[]) {
   return tiles.reduce(
@@ -231,6 +136,95 @@ function getBagAriaLabel(
   return summary.length > 0
     ? `Bag has ${counts.total} future tiles including the current offer. Canonical tile previews show the red endpoint on the bottom edge: ${summary}.`
     : 'Bag is empty.';
+}
+
+function compareCellKeysByCoordinate(a: string, b: string): number {
+  const [aCol, aRow] = a.split(',').map(Number);
+  const [bCol, bRow] = b.split(',').map(Number);
+
+  if (aCol !== bCol) {
+    return aCol - bCol;
+  }
+
+  return aRow - bRow;
+}
+
+function formatCellList(keys: string[], emptyLabel: string): string {
+  if (keys.length === 0) {
+    return emptyLabel;
+  }
+
+  return [...keys]
+    .sort(compareCellKeysByCoordinate)
+    .map((key) => getBoardCoordinateLabelFromKey(key))
+    .join(', ');
+}
+
+function buildSetupCardText({
+  game,
+}: {
+  game: ReturnType<typeof createGame>;
+}): string {
+  return [
+    'Traingame Setup Card',
+    `Board: ${game.board.width}x${game.board.height} ${game.board.shape}`,
+    `Start: ${getBoardCoordinateLabelFromKey(game.board.start.key)}`,
+    `Bag: ${game.rules.straightWeight} straight, ${game.rules.softWeight} soft-turn, ${game.rules.hardWeight} hard-turn`,
+    `Starting survey tokens: ${game.rules.startingTokens}`,
+    `Mountains: ${formatCellList(game.obstacleCells, 'none')}`,
+    `Survey token spaces: ${formatCellList(game.tokenCells, 'none')}`,
+    `Seed: ${game.rules.seed}`,
+  ].join('\n');
+}
+
+async function copyText(text: string): Promise<boolean> {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fall back below for browsers that block the async clipboard API.
+    }
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.top = '0';
+  textarea.style.left = '-9999px';
+  textarea.style.opacity = '0';
+
+  document.body.append(textarea);
+  textarea.focus();
+  textarea.select();
+
+  try {
+    return document.execCommand('copy');
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+  }
+}
+
+function getMobileOfferColumns(
+  offerCount: number,
+  isCompactMobileLayout: boolean,
+): number {
+  if (offerCount <= 1) {
+    return 1;
+  }
+
+  if (offerCount <= 2) {
+    return 2;
+  }
+
+  if (offerCount <= 4 || isCompactMobileLayout) {
+    return 4;
+  }
+
+  return 6;
 }
 
 function BagIndicator({
@@ -314,6 +308,10 @@ function App() {
   const [game, setGame] = useState(initialAppState.game);
   const [hoveredTileId, setHoveredTileId] = useState<string | null>(null);
   const [isMobileLayout, setIsMobileLayout] = useState(false);
+  const [isCompactMobileLayout, setIsCompactMobileLayout] = useState(false);
+  const [copySetupStatus, setCopySetupStatus] = useState<
+    'idle' | 'copied' | 'failed'
+  >('idle');
   const [showPlaytestControls, setShowPlaytestControls] = useState(
     initialAppState.showPlaytestControls,
   );
@@ -331,29 +329,32 @@ function App() {
   const estimatedCells = estimateBoardCellCount(draftRules);
   const bagCounts = getBagCounts([...game.deck, ...game.offer]);
   const normalizedDraftRules = normalizeRules(draftRules);
+  const setupCardText = useMemo(() => buildSetupCardText({ game }), [game]);
+  const activePreset = findMatchingRulesPreset(activeRules);
+  const mobileOfferColumns = getMobileOfferColumns(
+    game.offer.length,
+    isCompactMobileLayout,
+  );
+  const playbarGridStyle = isMobileLayout
+    ? ({ '--offer-columns': String(mobileOfferColumns) } as CSSProperties)
+    : undefined;
   const draftChanged =
     JSON.stringify(normalizedDraftRules) !== JSON.stringify(activeRules);
-  const activePresetId =
-    RULES_PRESETS.find(
-      (preset) =>
-        JSON.stringify(normalizedDraftRules) ===
-        JSON.stringify(
-          normalizeRules({
-            ...preset.rules,
-            seed: draftRules.seed,
-          }),
-        ),
-    )?.id ?? null;
-
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 720px)');
-    const syncLayout = () => setIsMobileLayout(mediaQuery.matches);
+    const mobileQuery = window.matchMedia('(max-width: 720px)');
+    const compactMobileQuery = window.matchMedia('(max-width: 380px)');
+    const syncLayout = () => {
+      setIsMobileLayout(mobileQuery.matches);
+      setIsCompactMobileLayout(compactMobileQuery.matches);
+    };
 
     syncLayout();
-    mediaQuery.addEventListener('change', syncLayout);
+    mobileQuery.addEventListener('change', syncLayout);
+    compactMobileQuery.addEventListener('change', syncLayout);
 
     return () => {
-      mediaQuery.removeEventListener('change', syncLayout);
+      mobileQuery.removeEventListener('change', syncLayout);
+      compactMobileQuery.removeEventListener('change', syncLayout);
     };
   }, []);
 
@@ -365,6 +366,20 @@ function App() {
       showPlaytestControls,
     });
   }, [activeRules, draftRules, game, showPlaytestControls]);
+
+  useEffect(() => {
+    if (copySetupStatus === 'idle') {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setCopySetupStatus('idle');
+    }, 2200);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [copySetupStatus]);
 
   useEffect(() => {
     if (!showPlaytestControls) {
@@ -466,18 +481,9 @@ function App() {
     startTransition(() => {
       setActiveRules(normalizedRules);
       setDraftRules(normalizedRules);
-      setGame(createGame(normalizedRules));
+      setGame(createGameForRules(normalizedRules));
       setHoveredTileId(null);
     });
-  }
-
-  function applyRulesPreset(preset: RulesPreset) {
-    setDraftRules((currentRules) =>
-      normalizeRules({
-        ...preset.rules,
-        seed: currentRules.seed,
-      }),
-    );
   }
 
   function handleNewGame() {
@@ -487,7 +493,7 @@ function App() {
       ...currentRules,
       seed: nextRules.seed,
     }));
-    setGame(createGame(nextRules));
+    setGame(createGameForRules(nextRules));
     setHoveredTileId(null);
   }
 
@@ -515,6 +521,24 @@ function App() {
     setShowPlaytestControls((currentValue) => !currentValue);
   }
 
+  function handleChoosePreset(preset: RulesPreset) {
+    const presetRules = normalizeRules(withFreshSeed(preset.rules));
+    setActiveRules(presetRules);
+    setDraftRules(presetRules);
+    setGame(createGameFromSetupDeck(presetRules));
+    setHoveredTileId(null);
+  }
+
+  async function handleCopySetup() {
+    const copied = await copyText(setupCardText);
+
+    if (copied) {
+      setCopySetupStatus('copied');
+    } else {
+      setCopySetupStatus('failed');
+    }
+  }
+
   function renderTileChoices(compact: boolean) {
     if (game.offer.length === 0) {
       return (
@@ -525,7 +549,9 @@ function App() {
         >
           {game.status === 'playing'
             ? 'No options loaded.'
-            : 'Game over. Start a new game.'}
+            : game.status === 'won'
+              ? 'Route complete. Start a new game.'
+              : 'Game over. Start a new game.'}
         </p>
       );
     }
@@ -643,7 +669,7 @@ function App() {
           </div>
 
           <div className="playbar">
-            <div className="playbar-option-grid">
+            <div className="playbar-option-grid" style={playbarGridStyle}>
               {renderTileChoices(isMobileLayout)}
             </div>
           </div>
@@ -653,6 +679,11 @@ function App() {
       <main className="main-layout">
         <section className="play-column">
           <section className="panel board-panel">
+            <div className="board-panel-meta">
+              <span className="mode-pill">
+                {activePreset ? activePreset.label : 'Custom'}
+              </span>
+            </div>
             <HexBoard game={game} />
           </section>
 
@@ -736,13 +767,6 @@ function App() {
                 </button>
                 <button
                   className="button-secondary"
-                  onClick={() => setDraftRules(activeRules)}
-                  type="button"
-                >
-                  Revert draft
-                </button>
-                <button
-                  className="button-secondary"
                   onClick={handleResetDefaults}
                   type="button"
                 >
@@ -750,18 +774,26 @@ function App() {
                 </button>
               </div>
 
+              {copySetupStatus !== 'idle' ? (
+                <p className="control-copy-feedback">
+                  {copySetupStatus === 'copied'
+                    ? 'Setup card copied.'
+                    : 'Clipboard copy failed. The setup card text is below.'}
+                </p>
+              ) : null}
+
               <div className="control-group">
-                <p className="group-label">Presets</p>
+                <p className="group-label">Difficulty</p>
                 <div className="preset-grid">
                   {RULES_PRESETS.map((preset) => (
                     <button
                       className={
-                        activePresetId === preset.id
+                        activePreset?.id === preset.id
                           ? 'preset-card preset-card-active'
                           : 'preset-card'
                       }
                       key={preset.id}
-                      onClick={() => applyRulesPreset(preset)}
+                      onClick={() => handleChoosePreset(preset)}
                       type="button"
                     >
                       <span className="preset-card-label">{preset.label}</span>
@@ -770,6 +802,30 @@ function App() {
                       </span>
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div className="control-group">
+                <p className="group-label">Setup Card</p>
+                <div className="setup-card-box">
+                  <button
+                    aria-label="Copy setup card"
+                    className="setup-card-copy-button"
+                    onClick={() => {
+                      void handleCopySetup();
+                    }}
+                    type="button"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className="setup-card-copy-icon"
+                      viewBox="0 0 24 24"
+                    >
+                      <rect x="9" y="9" width="10" height="10" rx="2" />
+                      <path d="M7 15H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v1" />
+                    </svg>
+                  </button>
+                  <pre className="setup-card-preview">{setupCardText}</pre>
                 </div>
               </div>
 
@@ -968,6 +1024,7 @@ function App() {
                   </strong>
                 </article>
               </div>
+
             </div>
           </aside>
         </>

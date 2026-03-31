@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_RULES,
+  buildSetupDeck,
   chooseTile,
   createGame,
+  createGameFromSetupDeck,
   getContextualTileKind,
   getRecommendedTileCounts,
   normalizeRules,
   previewMove,
   spendSurveyToken,
 } from './game';
+
+const CANDIDATE_TILES = [
+  { id: 'straight', kind: 'straight' as const },
+  { id: 'soft-left', kind: 'softLeft' as const },
+  { id: 'soft-right', kind: 'softRight' as const },
+  { id: 'hard-left', kind: 'hardLeft' as const },
+  { id: 'hard-right', kind: 'hardRight' as const },
+];
 
 function toCube(col: number, row: number): [number, number, number] {
   const x = col;
@@ -127,16 +137,23 @@ describe('survey flow', () => {
   it('spends tokens and can be used multiple times in the same turn', () => {
     const game = createGame({
       ...DEFAULT_RULES,
-      startingTokens: 3,
+      startingTokens: 5,
     });
     const surveyedOnce = spendSurveyToken(game);
     const surveyedTwice = spendSurveyToken(surveyedOnce);
+    const surveyedThrice = spendSurveyToken(surveyedTwice);
+    const surveyedFourTimes = spendSurveyToken(surveyedThrice);
+    const surveyedFiveTimes = spendSurveyToken(surveyedFourTimes);
 
     expect(surveyedOnce.tokens).toBe(game.tokens - 1);
     expect(surveyedOnce.offer).toHaveLength(4);
     expect(surveyedTwice.tokens).toBe(game.tokens - 2);
     expect(surveyedTwice.offer).toHaveLength(6);
-    expect(surveyedTwice.surveyUsedThisTurn).toBe(false);
+    expect(surveyedThrice.offer).toHaveLength(8);
+    expect(surveyedFourTimes.offer).toHaveLength(10);
+    expect(surveyedFiveTimes.tokens).toBe(0);
+    expect(surveyedFiveTimes.offer).toHaveLength(12);
+    expect(surveyedFiveTimes.surveyUsedThisTurn).toBe(false);
   });
 
   it('does not spend a token if the bag is empty', () => {
@@ -163,6 +180,64 @@ describe('survey flow', () => {
 });
 
 describe('move resolution', () => {
+  it('builds a finite setup deck with unique legal cards', () => {
+    const setupDeck = buildSetupDeck(DEFAULT_RULES);
+
+    expect(setupDeck.length).toBeGreaterThan(1);
+
+    const signatures = new Set(
+      setupDeck.map(
+        (card) =>
+          `O:${card.obstacleKeys.join('|')}::T:${card.tokenKeys.join('|')}`,
+      ),
+    );
+
+    expect(signatures.size).toBe(setupDeck.length);
+
+    for (const card of setupDeck) {
+      expect(card.obstacleKeys.every((key) => key !== '3,7')).toBe(true);
+      expect(card.tokenKeys.every((key) => key !== '3,7')).toBe(true);
+      expect(card.obstacleKeys.some((key) => card.tokenKeys.includes(key))).toBe(
+        false,
+      );
+    }
+  });
+
+  it('draws setup cards from the ruleset deck when using deck mode', () => {
+    const setupDeck = buildSetupDeck(DEFAULT_RULES);
+    const setupCardIds = new Set(setupDeck.map((card) => card.id));
+    const seen = new Set<string>();
+
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const game = createGameFromSetupDeck({
+        ...DEFAULT_RULES,
+        seed,
+      });
+
+      expect(game.setupCardId).toBeDefined();
+      expect(setupCardIds.has(game.setupCardId!)).toBe(true);
+      seen.add(game.setupCardId!);
+    }
+
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
+  it('uses fully random feature placement in the live game flow', () => {
+    const seen = new Set<string>();
+
+    for (let seed = 1; seed <= 24; seed += 1) {
+      const game = createGame({
+        ...DEFAULT_RULES,
+        seed,
+      });
+      seen.add(
+        `O:${game.obstacleCells.join('|')}::T:${game.tokenCells.join('|')}`,
+      );
+    }
+
+    expect(seen.size).toBeGreaterThan(1);
+  });
+
   it('starts by pointing players at highlighted goal spaces', () => {
     const game = createGame(DEFAULT_RULES);
 
@@ -240,6 +315,24 @@ describe('move resolution', () => {
     expect(tokenDistanceTotal / tokenCount).toBeLessThan(
       candidateDistanceTotal / candidateCount,
     );
+  });
+
+  it('never places mountains where the opening move would immediately hit them', () => {
+    for (let seed = 1; seed <= 48; seed += 1) {
+      const game = createGame({
+        ...DEFAULT_RULES,
+        featureDensityPercent: 40,
+        hazardBalancePercent: 100,
+        seed,
+      });
+
+      for (const tile of CANDIDATE_TILES) {
+        const preview = previewMove(game, tile);
+
+        expect(preview.reason).not.toBe('Hits an obstacle.');
+        expect(preview.reason).not.toBe('Steers into an obstacle.');
+      }
+    }
   });
 
   it('plays a tile and advances the frontier when the move is safe', () => {
@@ -353,17 +446,9 @@ describe('move resolution', () => {
       featureDensityPercent: 0,
       seed: 11,
     });
-    const candidateTiles = [
-      { id: 'straight', kind: 'straight' as const },
-      { id: 'soft-left', kind: 'softLeft' as const },
-      { id: 'soft-right', kind: 'softRight' as const },
-      { id: 'hard-left', kind: 'hardLeft' as const },
-      { id: 'hard-right', kind: 'hardRight' as const },
-    ];
-
     let blockedPreview: ReturnType<typeof previewMove> | undefined;
 
-    for (const tile of candidateTiles) {
+    for (const tile of CANDIDATE_TILES) {
       const initialPreview = previewMove(game, tile);
       if (initialPreview.outcome !== 'continue' || !initialPreview.nextKey) {
         continue;
@@ -393,23 +478,16 @@ describe('move resolution', () => {
       seed: 11,
     });
     const approachCells = game.board.cells.filter((cell) => cell.row === 1);
-    const candidateTiles = [
-      { id: 'straight', kind: 'straight' as const },
-      { id: 'soft-left', kind: 'softLeft' as const },
-      { id: 'soft-right', kind: 'softRight' as const },
-      { id: 'hard-left', kind: 'hardLeft' as const },
-      { id: 'hard-right', kind: 'hardRight' as const },
-    ];
     const edges = [0, 1, 2, 3, 4, 5] as const;
 
     expect(approachCells.length).toBeGreaterThan(0);
 
-    let winningTile: (typeof candidateTiles)[number] | undefined;
+    let winningTile: (typeof CANDIDATE_TILES)[number] | undefined;
     let goalGame: ReturnType<typeof createGame> | undefined;
 
     for (const approachCell of approachCells) {
       for (const entryEdge of edges) {
-        for (const tile of candidateTiles) {
+        for (const tile of CANDIDATE_TILES) {
           const trialGame = {
             ...game,
             frontier: {

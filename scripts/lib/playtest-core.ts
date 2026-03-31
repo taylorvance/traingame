@@ -7,6 +7,7 @@ import {
   type TileKind,
   chooseTile,
   createGame,
+  createGameFromSetupDeck,
   previewMove,
   spendSurveyToken,
 } from '../../src/lib/game.ts';
@@ -37,6 +38,7 @@ export interface SimulatedTurn {
 export interface SimulatedGameResult {
   seed: number;
   policyId: PlaytestPolicyId;
+  setupCardId: string;
   status: GameState['status'];
   statusMessage: string;
   turnsPlayed: number;
@@ -83,6 +85,7 @@ export interface ExperimentConfig {
   rules: RulesConfig;
   games: number;
   seedStart?: number;
+  setupMode?: 'random' | 'deck';
   policy: PlaytestPolicyConfig;
 }
 
@@ -490,12 +493,18 @@ function shouldSpendSurveyForPolicy(
 export function simulateGame(
   rules: RulesConfig,
   policy: PlaytestPolicyConfig,
+  options?: {
+    setupMode?: 'random' | 'deck';
+  },
 ): SimulatedGameResult {
   const seededRules = {
     ...DEFAULT_RULES,
     ...rules,
   };
-  let game = createGame(seededRules);
+  let game =
+    options?.setupMode === 'deck'
+      ? createGameFromSetupDeck(seededRules)
+      : createGame(seededRules);
   const random = new SeededRandom((seededRules.seed ^ 0x9e3779b9) >>> 0);
   let surveysSpent = 0;
   let forcedLossTurns = 0;
@@ -551,6 +560,7 @@ export function simulateGame(
   return {
     seed: seededRules.seed,
     policyId: policy.id,
+    setupCardId: game.setupCardId ?? 'unknown',
     status: game.status,
     statusMessage: game.statusMessage,
     turnsPlayed: Object.keys(game.occupiedTracks).length,
@@ -590,6 +600,9 @@ export function runExperiment(config: ExperimentConfig): PlaytestAggregate {
         seed: seedStart + index,
       },
       config.policy,
+      {
+        setupMode: config.setupMode,
+      },
     );
 
     statusCounts[result.status] = (statusCounts[result.status] ?? 0) + 1;

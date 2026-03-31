@@ -67,6 +67,7 @@ export interface TurnRecord {
 export interface GameState {
   rules: RulesConfig;
   board: BoardState;
+  setupCardId?: string;
   status: GameStatus;
   statusMessage: string;
   turnNumber: number;
@@ -94,6 +95,12 @@ export interface MovePreview {
   reason: string;
 }
 
+export interface SetupCard {
+  id: string;
+  obstacleKeys: string[];
+  tokenKeys: string[];
+}
+
 const DEFAULT_SEED = 4317;
 const START_ENTRY_EDGE: Edge = 3;
 const DEFAULT_BOARD_WIDTH = 7;
@@ -101,6 +108,59 @@ const DEFAULT_BOARD_HEIGHT = 8;
 const DEFAULT_STRAIGHT_TILES = 4;
 const DEFAULT_SOFT_TILES = 10;
 const DEFAULT_HARD_TILES = 8;
+const OPENING_BUFFER_TILE_KINDS: TileKind[] = ['hardLeft', 'hardRight'];
+const OPENING_MOVE_TILE_KINDS: TileKind[] = [
+  'straight',
+  'softLeft',
+  'softRight',
+  'hardLeft',
+  'hardRight',
+];
+const SETUP_DECK_TARGET_SIZE = 12;
+const SETUP_DECK_MAX_ATTEMPTS = 192;
+const setupDeckCache = new Map<string, SetupCard[]>();
+const CURATED_SETUP_DECK_IDS: Record<string, string[]> = {
+  '7:8:symmetric:16:30:2:6:8:6': [
+    'setup-01',
+    'setup-03',
+    'setup-04',
+    'setup-06',
+    'setup-07',
+    'setup-09',
+    'setup-10',
+    'setup-11',
+  ],
+  '7:8:symmetric:18:36:1:8:8:4': [
+    'setup-01',
+    'setup-05',
+    'setup-06',
+    'setup-07',
+    'setup-08',
+    'setup-09',
+    'setup-10',
+    'setup-12',
+  ],
+  '7:8:symmetric:24:24:1:8:8:4': [
+    'setup-02',
+    'setup-04',
+    'setup-05',
+    'setup-06',
+    'setup-07',
+    'setup-08',
+    'setup-10',
+    'setup-11',
+  ],
+  '7:8:symmetric:20:46:1:6:8:6': [
+    'setup-01',
+    'setup-03',
+    'setup-04',
+    'setup-05',
+    'setup-06',
+    'setup-09',
+    'setup-10',
+    'setup-12',
+  ],
+};
 
 export const DEFAULT_RULES: RulesConfig = {
   boardWidth: DEFAULT_BOARD_WIDTH,
@@ -135,6 +195,24 @@ function clampOdd(value: number, min: number, max: number): number {
 
 function cellKey(col: number, row: number): string {
   return `${col},${row}`;
+}
+
+function getColumnLabel(col: number): string {
+  return String.fromCharCode(65 + col);
+}
+
+export function getBoardCoordinateLabel(col: number, row: number): string {
+  return `${getColumnLabel(col)}${row + 1}`;
+}
+
+export function getBoardCoordinateLabelFromKey(key: string): string {
+  const [col, row] = key.split(',').map(Number);
+
+  if (!Number.isFinite(col) || !Number.isFinite(row)) {
+    return key;
+  }
+
+  return getBoardCoordinateLabel(col, row);
 }
 
 function toggleColor(color: Color): Color {
@@ -240,25 +318,48 @@ function buildRowSpan(
   return [0, width - 1];
 }
 
-function getOpeningBufferPositions(start: Cell): Cell[] {
-  const hardTurnKinds: TileKind[] = ['hardLeft', 'hardRight'];
+function getOpeningExitPositions(start: Cell, tileKinds: TileKind[]): Cell[] {
+  const positions: Cell[] = [];
+  const seen = new Set<string>();
 
-  return hardTurnKinds.map((tileKind) => {
+  for (const tileKind of tileKinds) {
     const exitEdge = getExitEdge(START_ENTRY_EDGE, tileKind);
     const [col, row] = getNeighbor(start.col, start.row, exitEdge);
+    const key = cellKey(col, row);
 
-    return {
+    if (seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    positions.push({
       col,
       row,
-      key: cellKey(col, row),
-    };
-  });
+      key,
+    });
+  }
+
+  return positions;
+}
+
+function getOpeningBufferPositions(start: Cell): Cell[] {
+  return getOpeningExitPositions(start, OPENING_BUFFER_TILE_KINDS);
 }
 
 function getOpeningBufferKeys(board: BoardState): Set<string> {
   return new Set(
     getOpeningBufferPositions(board.start)
       .filter((cell) => board.cells.some((candidate) => candidate.key === cell.key))
+      .map((cell) => cell.key),
+  );
+}
+
+function getOpeningMoveKeys(board: BoardState): Set<string> {
+  const boardCellKeys = new Set(board.cells.map((cell) => cell.key));
+
+  return new Set(
+    getOpeningExitPositions(board.start, OPENING_MOVE_TILE_KINDS)
+      .filter((cell) => boardCellKeys.has(cell.key))
       .map((cell) => cell.key),
   );
 }
@@ -396,6 +497,174 @@ function getPlacementProfile(
     progress: 1 - cell.row / maxRowDistance,
     centrality: 1 - Math.abs(cell.col - boardCenterCol) / maxColDistance,
   };
+}
+
+function evaluateSetupCard(board: BoardState, card: SetupCard): number {
+  const cellMap = new Map(board.cells.map((cell) => [cell.key, cell]));
+  const obstacles = card.obstacleKeys
+    .map((key) => cellMap.get(key))
+    .filter((cell): cell is Cell => Boolean(cell));
+  const tokens = card.tokenKeys
+    .map((key) => cellMap.get(key))
+    .filter((cell): cell is Cell => Boolean(cell));
+  let pressure = 0;
+
+  for (const obstacle of obstacles) {
+    const { progress, centrality } = getPlacementProfile(board, obstacle);
+    pressure += 1.2 + progress * 1.8 + centrality * 1.4;
+    pressure += Math.max(0, 3 - getHexDistance(board.start, obstacle)) * 0.35;
+  }
+
+  for (let index = 0; index < obstacles.length; index += 1) {
+    for (
+      let comparisonIndex = index + 1;
+      comparisonIndex < obstacles.length;
+      comparisonIndex += 1
+    ) {
+      const distance = getHexDistance(
+        obstacles[index]!,
+        obstacles[comparisonIndex]!,
+      );
+
+      if (distance <= 1) {
+        pressure += 1.4;
+      } else if (distance === 2) {
+        pressure += 0.7;
+      }
+    }
+  }
+
+  for (const token of tokens) {
+    const { progress, centrality } = getPlacementProfile(board, token);
+    pressure -= 0.8 + progress * 1.1 + centrality * 0.5;
+
+    if (obstacles.length === 0) {
+      continue;
+    }
+
+    const nearestObstacleDistance = Math.min(
+      ...obstacles.map((obstacle) => getHexDistance(token, obstacle)),
+    );
+
+    if (nearestObstacleDistance <= 1) {
+      pressure -= 0.9;
+    } else if (nearestObstacleDistance <= 2) {
+      pressure -= 0.45;
+    }
+  }
+
+  return pressure;
+}
+
+function getSetupDeckDifficultyWindow(
+  rules: RulesConfig,
+): [startFraction: number, endFraction: number] {
+  const targetCenter = clamp(
+    0.4
+      + (rules.hazardBalancePercent - 35) / 120
+      + (rules.featureDensityPercent - 18) / 100
+      + (rules.hardWeight - rules.straightWeight) / 40
+      - (rules.startingTokens - 1) * 0.12,
+    0.18,
+    0.62,
+  );
+
+  return [
+    clamp(targetCenter - 0.12, 0, 1),
+    clamp(targetCenter + 0.12, 0, 1),
+  ];
+}
+
+function applyCuratedSetupDeck(
+  rules: RulesConfig,
+  cards: readonly SetupCard[],
+): SetupCard[] {
+  const curatedCardIds = CURATED_SETUP_DECK_IDS[getSetupDeckCacheKey(rules)];
+  if (!curatedCardIds) {
+    return [...cards];
+  }
+
+  const curatedIdSet = new Set(curatedCardIds);
+  const curatedCards = cards.filter((card) => curatedIdSet.has(card.id));
+
+  return curatedCards.length > 0 ? curatedCards : [...cards];
+}
+
+function selectSetupDeckCards(
+  board: BoardState,
+  rules: RulesConfig,
+  cards: readonly SetupCard[],
+  targetCardCount: number,
+): SetupCard[] {
+  if (cards.length <= targetCardCount) {
+    return cards.map((card, index) => ({
+      ...card,
+      id: `setup-${String(index + 1).padStart(2, '0')}`,
+    }));
+  }
+
+  const sortedByDifficulty = [...cards].sort(
+    (left, right) => evaluateSetupCard(board, left) - evaluateSetupCard(board, right),
+  );
+  const [startFraction, endFraction] = getSetupDeckDifficultyWindow(rules);
+  const startIndex = Math.floor((sortedByDifficulty.length - 1) * startFraction);
+  const endIndex = Math.max(
+    startIndex,
+    Math.floor((sortedByDifficulty.length - 1) * endFraction),
+  );
+  const windowCards = sortedByDifficulty.slice(startIndex, endIndex + 1);
+  const chosen: SetupCard[] = [];
+  const usedSignatures = new Set<string>();
+
+  for (let index = 0; index < targetCardCount; index += 1) {
+    const sampleIndex = Math.min(
+      windowCards.length - 1,
+      Math.floor(((index + 0.5) / targetCardCount) * windowCards.length),
+    );
+    const candidate = windowCards[sampleIndex] ?? windowCards[windowCards.length - 1];
+    const signature = getSetupCardSignature(
+      candidate?.obstacleKeys ?? [],
+      candidate?.tokenKeys ?? [],
+    );
+
+    if (!candidate || usedSignatures.has(signature)) {
+      continue;
+    }
+
+    usedSignatures.add(signature);
+    chosen.push(candidate);
+  }
+
+  const centeredFallbackCards = windowCards
+    .map((card, index) => ({
+      card,
+      distanceFromCenter: Math.abs(index - (windowCards.length - 1) / 2),
+    }))
+    .sort((left, right) => left.distanceFromCenter - right.distanceFromCenter)
+    .map(({ card }) => card);
+
+  for (const candidate of centeredFallbackCards) {
+    if (chosen.length >= targetCardCount) {
+      break;
+    }
+
+    const signature = getSetupCardSignature(
+      candidate.obstacleKeys,
+      candidate.tokenKeys,
+    );
+
+    if (usedSignatures.has(signature)) {
+      continue;
+    }
+
+    usedSignatures.add(signature);
+    chosen.push(candidate);
+  }
+
+  return chosen.map((card, index) => ({
+    ...card,
+    id: `setup-${String(index + 1).padStart(2, '0')}`,
+  }));
 }
 
 function splitTurnTileCount(
@@ -546,12 +815,78 @@ function sampleWeightedCellKeys(
   return [chosen, nextState];
 }
 
+function compareCellKeys(left: string, right: string): number {
+  const [leftCol = 0, leftRow = 0] = left.split(',').map(Number);
+  const [rightCol = 0, rightRow = 0] = right.split(',').map(Number);
+
+  if (leftRow !== rightRow) {
+    return leftRow - rightRow;
+  }
+
+  return leftCol - rightCol;
+}
+
+function sortCellKeys(keys: string[]): string[] {
+  return [...keys].sort(compareCellKeys);
+}
+
+function getSetupDeckCacheKey(rules: RulesConfig): string {
+  return [
+    rules.boardWidth,
+    rules.boardHeight,
+    rules.boardShape,
+    rules.featureDensityPercent,
+    rules.hazardBalancePercent,
+    rules.startingTokens,
+    rules.straightWeight,
+    rules.softWeight,
+    rules.hardWeight,
+  ].join(':');
+}
+
+function hashSetupDeckRules(rules: RulesConfig): number {
+  const values = [
+    rules.boardWidth,
+    rules.boardHeight,
+    rules.boardShape === 'symmetric'
+      ? 1
+      : rules.boardShape === 'asymmetric-left'
+        ? 2
+        : 3,
+    rules.featureDensityPercent,
+    rules.hazardBalancePercent,
+    rules.startingTokens,
+    rules.straightWeight,
+    rules.softWeight,
+    rules.hardWeight,
+  ];
+  let hash = 0x811c9dc5;
+
+  for (const value of values) {
+    hash ^= value >>> 0;
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+
+  return hash || DEFAULT_SEED;
+}
+
+function getSetupCardSignature(
+  obstacleKeys: readonly string[],
+  tokenKeys: readonly string[],
+): string {
+  return `O:${obstacleKeys.join('|')}::T:${tokenKeys.join('|')}`;
+}
+
 function generateBoardFeatures(
   board: BoardState,
   rules: RulesConfig,
   state: number,
 ): [string[], string[], number] {
   const featureCells = getFeatureCells(board);
+  const openingMoveKeys = getOpeningMoveKeys(board);
+  const obstacleCandidates = featureCells.filter(
+    (cell) => !openingMoveKeys.has(cell.key),
+  );
   const desiredFeatures = getDesiredFeatureCount(
     featureCells.length,
     rules.featureDensityPercent,
@@ -561,10 +896,11 @@ function generateBoardFeatures(
   );
   const obstacleCap = Math.min(
     desiredObstacles,
+    obstacleCandidates.length,
     Math.max(0, featureCells.length - 1),
   );
   const [obstacleCells, obstacleState] = sampleWeightedCellKeys(
-    featureCells,
+    obstacleCandidates,
     obstacleCap,
     state,
     (cell) => {
@@ -624,6 +960,83 @@ function generateBoardFeatures(
   );
 
   return [tokenCells, obstacleCells, tokenState];
+}
+
+export function buildSetupDeck(inputRules: RulesConfig): SetupCard[] {
+  const rules = normalizeRules({
+    ...inputRules,
+    seed: DEFAULT_SEED,
+  });
+  const cacheKey = getSetupDeckCacheKey(rules);
+  const cachedDeck = setupDeckCache.get(cacheKey);
+  if (cachedDeck) {
+    return cachedDeck;
+  }
+
+  const board = buildBoard(rules);
+  const desiredFeatures = getDesiredFeatureCount(
+    getFeatureCells(board).length,
+    rules.featureDensityPercent,
+  );
+  const targetCardCount =
+    desiredFeatures === 0
+      ? 1
+      : Math.min(
+          SETUP_DECK_TARGET_SIZE,
+          Math.max(6, desiredFeatures * 2),
+        );
+  const deckSeed = hashSetupDeckRules(rules);
+  const candidateCards: SetupCard[] = [];
+  const seen = new Set<string>();
+
+  for (
+    let attempt = 0;
+    attempt < SETUP_DECK_MAX_ATTEMPTS
+    && candidateCards.length < targetCardCount * 4;
+    attempt += 1
+  ) {
+    const sampleSeed = (deckSeed + Math.imul(attempt + 1, 0x9e3779b1)) >>> 0;
+    const [tokenCells, obstacleCells] = generateBoardFeatures(
+      board,
+      rules,
+      sampleSeed || DEFAULT_SEED,
+    );
+    const sortedObstacleKeys = sortCellKeys(obstacleCells);
+    const sortedTokenKeys = sortCellKeys(tokenCells);
+    const signature = getSetupCardSignature(
+      sortedObstacleKeys,
+      sortedTokenKeys,
+    );
+
+    if (seen.has(signature)) {
+      continue;
+    }
+
+    seen.add(signature);
+    candidateCards.push({
+      id: `setup-${String(candidateCards.length + 1).padStart(2, '0')}`,
+      obstacleKeys: sortedObstacleKeys,
+      tokenKeys: sortedTokenKeys,
+    });
+  }
+
+  if (candidateCards.length === 0) {
+    candidateCards.push({
+      id: 'setup-01',
+      obstacleKeys: [],
+      tokenKeys: [],
+    });
+  }
+
+  const cards = selectSetupDeckCards(
+    board,
+    rules,
+    candidateCards,
+    Math.min(targetCardCount, candidateCards.length),
+  );
+  const curatedCards = applyCuratedSetupDeck(rules, cards);
+  setupDeckCache.set(cacheKey, curatedCards);
+  return curatedCards;
 }
 
 function getNeighbor(col: number, row: number, edge: Edge): [number, number] {
@@ -875,6 +1288,57 @@ function drawNextTurnOffer(
     nextTileSerial,
     rngState,
     surveyUsedThisTurn: false,
+  };
+}
+
+export function createGameFromSetupDeck(inputRules: RulesConfig): GameState {
+  const rules = normalizeRules(inputRules);
+  const board = buildBoard(rules);
+  const setupDeck = buildSetupDeck(rules);
+  const [setupCardIndex, featureState] = randomIndex(
+    setupDeck.length,
+    rules.seed >>> 0,
+  );
+  const setupCard = setupDeck[setupCardIndex] ?? setupDeck[0]!;
+  const tokenCells = setupCard.tokenKeys;
+  const obstacleCells = setupCard.obstacleKeys;
+  const [bagDeck, nextTileSerial, rngState] = createTileBatch(
+    rules,
+    1,
+    featureState,
+  );
+  const [initialDeck, initialOffer] = drawTiles(
+    bagDeck,
+    2,
+    rules,
+    board.cells.length,
+    nextTileSerial,
+    rngState,
+  );
+
+  return {
+    rules,
+    board,
+    setupCardId: setupCard.id,
+    status: 'playing',
+    statusMessage: 'Lay track from the bottom to any highlighted goal space.',
+    turnNumber: 1,
+    tokens: rules.startingTokens,
+    frontier: {
+      col: board.start.col,
+      row: board.start.row,
+      entryEdge: START_ENTRY_EDGE,
+      requiredColor: 'red',
+    },
+    tokenCells,
+    obstacleCells,
+    occupiedTracks: {},
+    offer: initialOffer,
+    surveyUsedThisTurn: false,
+    history: [],
+    deck: initialDeck,
+    rngState,
+    nextTileSerial,
   };
 }
 

@@ -1,4 +1,9 @@
-import { getExitEdge, type Color, type GameState } from '../lib/game';
+import {
+  getBoardCoordinateLabel,
+  getExitEdge,
+  type Color,
+  type GameState,
+} from '../lib/game';
 import { getEdgeTieSegment, getHexPoints, getRailPaths } from './railGeometry';
 import SurveyTokenGlyph from './SurveyTokenGlyph';
 
@@ -76,6 +81,7 @@ export default function HexBoard({ game }: { game: GameState }) {
         const isObstacle = game.obstacleCells.includes(cell.key);
         const hasToken = game.tokenCells.includes(cell.key);
         const isGoal = cell.row === 0;
+        const coordinateLabel = getBoardCoordinateLabel(cell.col, cell.row);
 
         return (
           <g className="board-cell" key={cell.key}>
@@ -101,6 +107,15 @@ export default function HexBoard({ game }: { game: GameState }) {
               className={`hex-tile ${isGoal ? 'goal-cell' : ''} ${isObstacle ? 'obstacle-cell' : ''} ${isFrontier ? 'frontier-cell' : ''}`}
               points={hexPoints}
             />
+
+            <text
+              aria-hidden="true"
+              className={`board-coordinate ${isGoal ? 'board-coordinate-goal' : ''}`}
+              x={center.x - 15}
+              y={center.y - 14}
+            >
+              {coordinateLabel}
+            </text>
 
             {isObstacle ? (
               <g
