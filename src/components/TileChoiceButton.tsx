@@ -135,19 +135,25 @@ export function TileChoiceButton({
 }
 
 export function SurveyTokenButton({
+  canDrawMore = true,
   compact = false,
   disabled,
   onClick,
   tokens,
 }: {
+  canDrawMore?: boolean;
   compact?: boolean;
   disabled: boolean;
   onClick: () => void;
   tokens: number;
 }) {
+  const ariaLabel = !canDrawMore
+    ? 'No more track tiles remain in the bag.'
+    : 'Spend 1 token to draw 2 extra tile choices.';
+
   return (
     <button
-      aria-label={`Spend 1 token to draw 2 extra tile choices. ${tokens} tokens available.`}
+      aria-label={ariaLabel}
       className={
         compact
           ? 'survey-token-inline survey-token-inline-compact'
@@ -155,6 +161,7 @@ export function SurveyTokenButton({
       }
       disabled={disabled}
       onClick={onClick}
+      title={ariaLabel}
       type="button"
     >
       <svg

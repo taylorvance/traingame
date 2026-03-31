@@ -134,7 +134,7 @@ function getBagAriaLabel(
     .join(', ');
 
   return summary.length > 0
-    ? `Bag has ${counts.total} future tiles including the current offer. Canonical tile previews show the red endpoint on the bottom edge: ${summary}.`
+    ? `Bag has ${counts.total} tiles left to draw: ${summary}.`
     : 'Bag is empty.';
 }
 
@@ -327,7 +327,7 @@ function App() {
   const estimatedFeatures = estimateFeatureCount(draftRules);
   const estimatedTokens = estimateTokenCount(draftRules);
   const estimatedCells = estimateBoardCellCount(draftRules);
-  const bagCounts = getBagCounts([...game.deck, ...game.offer]);
+  const bagCounts = getBagCounts(game.deck);
   const normalizedDraftRules = normalizeRules(draftRules);
   const setupCardText = useMemo(() => buildSetupCardText({ game }), [game]);
   const activePreset = findMatchingRulesPreset(activeRules);
@@ -652,7 +652,12 @@ function App() {
               <BagIndicator counts={bagCounts} />
               <SurveyTokenButton
                 compact={isMobileLayout}
-                disabled={game.status !== 'playing' || game.tokens <= 0}
+                canDrawMore={game.deck.length > 0}
+                disabled={
+                  game.status !== 'playing'
+                  || game.tokens <= 0
+                  || game.deck.length <= 0
+                }
                 onClick={handleSpendToken}
                 tokens={game.tokens}
               />
