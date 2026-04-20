@@ -33,7 +33,7 @@ The Vite base path auto-detects the repository name during GitHub Actions builds
 deploy to a standard project Pages URL without a custom build override. You can still override it
 manually with `VITE_BASE_PATH` if needed.
 
-The app also now uses `@taylorvance/tv-shared-runtime` for project-scoped local persistence, so
+The app also now uses `@taylorvance/tv-shared-web` for project-scoped local persistence, so
 the current run and playtest settings can survive refreshes without colliding with other local apps.
 
 ## Docs

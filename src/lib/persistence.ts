@@ -1,7 +1,7 @@
 import {
   createProjectStorage,
   type ProjectStorage,
-} from '@taylorvance/tv-shared-runtime/storage';
+} from '@taylorvance/tv-shared-web/storage';
 import {
   DEFAULT_RULES,
   createGame,

@@ -1,5 +1,5 @@
 {
-  "extends": "@taylorvance/tv-shared-config/tsconfig/vite-node.json",
+  "extends": "@taylorvance/tv-shared-dev/tsconfig/vite-node.json",
   "compilerOptions": {
     "composite": true,
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",

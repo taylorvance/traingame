@@ -1,4 +1,4 @@
-import { createProjectStorage } from '@taylorvance/tv-shared-runtime/storage';
+import { createProjectStorage } from '@taylorvance/tv-shared-web/storage';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, createGame } from './game';
 import {

@@ -1,3 +1,3 @@
-import prettierConfig from '@taylorvance/tv-shared-config/prettier'
+import prettierConfig from '@taylorvance/tv-shared-dev/prettier'
 
 export default prettierConfig

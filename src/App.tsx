@@ -5,7 +5,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
-import { BrandBadge } from '@taylorvance/tv-shared-ui';
+import { BrandBadge } from '@taylorvance/tv-shared-web/BrandBadge';
 import './App.css';
 import HexBoard from './components/HexBoard';
 import {
